@@ -7,33 +7,49 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 )
 
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Попередження: файл .env не знайдено, використовуються системні змінні")
+		log.Println("Попередження: файл .env не знайдено...")
 	}
 
-	faceitKey := os.Getenv("FACEIT_API_KEY")
-	if faceitKey == "" {
-		log.Fatal("Критична помилка: FACEIT_API_KEY не знайдено в оточенні!")
+	apiKey := os.Getenv("FACEIT_API_KEY")
+	if apiKey == "" {
+		log.Fatal("Критична помилка: FACEIT_API_KEY не знайдено!")
 	}
-
-	maskedKey := faceitKey
-	if len(faceitKey) > 4 {
-		maskedKey = faceitKey[:4] + "..."
-	}
-	fmt.Printf("Faceit API Key успішно завантажено: %s\n", maskedKey)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "Вітаю! Сервер працює, ключ Faceit підключено.")
+		profile, err := faceit.GetPlayerProfile("xhanjo", apiKey)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Помилка отримання даних: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Fprintf(w, "Вітаю на дашборді!\n\n")
+		fmt.Fprintf(w, "Гравець: %s (ID: %s)\n\n", profile.Nickname, profile.PlayerID)
+
+		if cs2Stats, ok := profile.Games["cs2"]; ok {
+			fmt.Fprintf(w, "=== Статистика CS2 ===\n")
+			fmt.Fprintf(w, "Рівень (Lvl): %d\n", cs2Stats.SkillLevel)
+			fmt.Fprintf(w, "Faceit Elo: %d\n\n", cs2Stats.FaceitElo)
+		} else {
+			fmt.Fprintf(w, "Статистику CS2 не знайдено.\n\n")
+		}
+
+		if dota2Stats, ok := profile.Games["dota2"]; ok {
+			fmt.Fprintf(w, "=== Статистика Dota 2 ===\n")
+			fmt.Fprintf(w, "Рівень (Lvl): %d\n", dota2Stats.SkillLevel)
+			fmt.Fprintf(w, "Faceit Elo: %d\n", dota2Stats.FaceitElo)
+		}
 	})
 
 	port := ":8080"
 	fmt.Printf("Сервер запускається на порту %s...\n", port)
 
 	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatal("Помилка запуску сервера: ", err)
+		log.Fatal("Помилка: ", err)
 	}
 }
