@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
@@ -26,7 +28,7 @@ func main() {
 	if err := db.InitTable(); err != nil {
 		log.Fatal("Не вдалося ініціалізувати таблиці:", err)
 	}
-	log.Println("База даних SQLite успішно підключена та ініціалізована!")
+	log.Println("База даних SQLite успішно підключена!")
 
 	apiKey := os.Getenv("FACEIT_API_KEY")
 	if apiKey == "" {
@@ -34,7 +36,6 @@ func main() {
 	}
 
 	http.HandleFunc("/api/player", func(w http.ResponseWriter, r *http.Request) {
-
 		nickname := r.URL.Query().Get("nickname")
 
 		if nickname == "" {
@@ -44,19 +45,36 @@ func main() {
 			return
 		}
 
-		profile, err := faceit.GetPlayerProfile(nickname, apiKey)
+		w.Header().Set("Content-Type", "application/json")
+
+		profile, err := db.GetPlayer(nickname)
+
+		if err == nil {
+			log.Printf("Дані для [%s] взяті з нашої БАЗИ ДАНИХ (миттєво)", nickname)
+			json.NewEncoder(w).Encode(profile)
+			return
+		}
+
+		if err != sql.ErrNoRows {
+			log.Printf("Помилка читання з БД: %v", err)
+		}
+
+		log.Printf("Гравця [%s] немає в базі, робимо запит до Faceit API...", nickname)
+		profile, err = faceit.GetPlayerProfile(nickname, apiKey)
 		if err != nil {
-			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"error": "Гравця не знайдено або помилка API"}`)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-
-		if err := json.NewEncoder(w).Encode(profile); err != nil {
-			log.Println("Помилка конвертації в JSON:", err)
+		err = db.SavePlayer(profile)
+		if err != nil {
+			log.Printf("Помилка збереження в БД: %v", err)
+		} else {
+			log.Printf("Дані гравця [%s] успішно збережено в БД!", nickname)
 		}
+
+		json.NewEncoder(w).Encode(profile)
 	})
 
 	port := ":8080"
