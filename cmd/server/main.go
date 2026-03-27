@@ -1,15 +1,15 @@
 package main
 
 import (
-	"encoding/json" // Додали пакет для перетворення наших структур у JSON-відповідь
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/joho/godotenv"
-	// УВАГА: перевір, чи тут правильна назва твого модуля
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
+	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
 
 func main() {
@@ -18,18 +18,25 @@ func main() {
 		log.Println("Попередження: файл .env не знайдено...")
 	}
 
+	db, err := storage.New("stats.db")
+	if err != nil {
+		log.Fatal("Не вдалося підключитися до бази даних:", err)
+	}
+
+	if err := db.InitTable(); err != nil {
+		log.Fatal("Не вдалося ініціалізувати таблиці:", err)
+	}
+	log.Println("База даних SQLite успішно підключена та ініціалізована!")
+
 	apiKey := os.Getenv("FACEIT_API_KEY")
 	if apiKey == "" {
 		log.Fatal("Критична помилка: FACEIT_API_KEY не знайдено!")
 	}
 
-	// Змінили адресу маршруту на більш професійну: /api/player
 	http.HandleFunc("/api/player", func(w http.ResponseWriter, r *http.Request) {
 
-		// 1. Читаємо нікнейм з URL-адреси браузера (те, що йде після ?nickname=...)
 		nickname := r.URL.Query().Get("nickname")
 
-		// Якщо користувач не ввів нікнейм — сваримося і повертаємо помилку 400 (Bad Request)
 		if nickname == "" {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
@@ -37,7 +44,6 @@ func main() {
 			return
 		}
 
-		// 2. Йдемо на Faceit шукати саме цього гравця
 		profile, err := faceit.GetPlayerProfile(nickname, apiKey)
 		if err != nil {
 			w.Header().Set("Content-Type", "application/json")
@@ -46,11 +52,8 @@ func main() {
 			return
 		}
 
-		// 3. Віддаємо успішний результат!
-		// Кажемо браузеру: "Увага, зараз полетить JSON, а не звичайний текст"
 		w.Header().Set("Content-Type", "application/json")
 
-		// Перетворюємо нашу структуру profile назад у JSON і відправляємо у w
 		if err := json.NewEncoder(w).Encode(profile); err != nil {
 			log.Println("Помилка конвертації в JSON:", err)
 		}
