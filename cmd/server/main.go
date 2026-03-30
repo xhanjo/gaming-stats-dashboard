@@ -17,18 +17,18 @@ import (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Попередження: файл .env не знайдено...")
+		log.Println("WARN: файл .env не знайдено.")
 	}
 
 	db, err := storage.New("stats.db")
 	if err != nil {
-		log.Fatal("Не вдалося підключитися до бази даних:", err)
+		log.Fatal("Критична помилка: Не вдалося підключитися до БД:", err)
 	}
 
 	if err := db.InitTable(); err != nil {
-		log.Fatal("Не вдалося ініціалізувати таблиці:", err)
+		log.Fatal("Критична помилка: Не вдалося ініціалізувати таблиці:", err)
 	}
-	log.Println("База даних SQLite успішно підключена!")
+	log.Println("INFO: База даних SQLite успішно підключена!")
 
 	apiKey := os.Getenv("FACEIT_API_KEY")
 	if apiKey == "" {
@@ -48,7 +48,6 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 
 		profile, err := db.GetPlayer(nickname)
-
 		if err == nil {
 			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
 			json.NewEncoder(w).Encode(profile)
@@ -68,19 +67,28 @@ func main() {
 			return
 		}
 
-		log.Printf("INFO: Отримуємо розширену статистику для ID: %s", profile.PlayerID)
+		log.Printf("INFO: Отримуємо загальну статистику для ID: %s", profile.PlayerID)
 		stats, err := faceit.GetCS2Stats(profile.PlayerID, apiKey)
 		if err == nil {
 			profile.Stats = stats
 		} else {
-			log.Printf("WARN: Не вдалося отримати детальну статистику CS2 для [%s]: %v", nickname, err)
+			log.Printf("WARN: Не вдалося отримати загальну статистику для [%s]: %v", nickname, err)
+		}
+
+		log.Printf("INFO: Розраховуємо форму гравця [%s] за останні 20 матчів.", nickname)
+		recentForm, err := faceit.CalculateRecentForm(profile.PlayerID, apiKey, 20)
+		if err == nil {
+			profile.Recent = recentForm
+			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)
+		} else {
+			log.Printf("WARN: Не вдалося розрахувати форму для [%s]: %v", nickname, err)
 		}
 
 		err = db.SavePlayer(profile)
 		if err != nil {
 			log.Printf("ERROR: Помилка збереження в БД: %v", err)
 		} else {
-			log.Printf("INFO: Дані гравця [%s] успішно збережено в БД", nickname)
+			log.Printf("INFO: Усі дані гравця [%s] успішно збережено в БД", nickname)
 		}
 
 		json.NewEncoder(w).Encode(profile)
@@ -90,6 +98,6 @@ func main() {
 	fmt.Printf("API Сервер запущено! Перевірте: http://localhost%s/api/player?nickname=xhanjo\n", port)
 
 	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatal("Помилка: ", err)
+		log.Fatal("Критична помилка: ", err)
 	}
 }

@@ -35,6 +35,13 @@ func (s *Storage) InitTable() error {
 		cs2_kd TEXT,
 		cs2_winrate TEXT,
 		cs2_matches TEXT,
+		recent_matches_analyzed INTEGER,
+		recent_avg_kills REAL,
+		recent_avg_adr REAL,
+		recent_avg_hs REAL,
+		recent_avg_kr REAL,
+		recent_total_entry INTEGER,
+		recent_total_sniper INTEGER,
 		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -42,7 +49,6 @@ func (s *Storage) InitTable() error {
 	if err != nil {
 		return fmt.Errorf("помилка створення таблиці: %v", err)
 	}
-
 	return nil
 }
 
@@ -59,54 +65,71 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		matches = profile.Stats.Lifetime.Matches
 	}
 
+	var rMatches, rEntry, rSniper int
+	var rKills, rADR, rHS, rKR float64
+
+	if profile.Recent != nil {
+		rMatches = profile.Recent.MatchesAnalyzed
+		rKills = profile.Recent.AvgKills
+		rADR = profile.Recent.AvgADR
+		rHS = profile.Recent.AvgHSPercentage
+		rKR = profile.Recent.AvgKRRatio
+		rEntry = profile.Recent.TotalEntryKills
+		rSniper = profile.Recent.TotalSniperKills
+	}
+
 	query := `
-	INSERT INTO players (player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches)
-	VALUES (?, ?, ?, ?, ?, ?, ?)
+	INSERT INTO players (
+		player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(player_id) DO UPDATE SET
-		nickname = excluded.nickname,
-		cs2_level = excluded.cs2_level,
-		cs2_elo = excluded.cs2_elo,
-		cs2_kd = excluded.cs2_kd,
-		cs2_winrate = excluded.cs2_winrate,
-		cs2_matches = excluded.cs2_matches,
+		nickname = excluded.nickname, cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
+		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches,
+		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
+		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
+		recent_total_entry = excluded.recent_total_entry, recent_total_sniper = excluded.recent_total_sniper,
 		last_updated = CURRENT_TIMESTAMP;`
 
-	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches)
+	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
+		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper)
 	return err
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	query := `
-	SELECT player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches 
-	FROM players 
-	WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
+	SELECT player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper
+	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
 	row := s.db.QueryRow(query, nickname)
 
-	var profile faceit.PlayerProfile
+	var p faceit.PlayerProfile
 	var cs2Level, cs2Elo int
 	var kd, winrate, matches string
+	var rMatches, rEntry, rSniper int
+	var rKills, rADR, rHS, rKR float64
 
-	err := row.Scan(&profile.PlayerID, &profile.Nickname, &cs2Level, &cs2Elo, &kd, &winrate, &matches)
+	err := row.Scan(&p.PlayerID, &p.Nickname, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
+		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper)
 	if err != nil {
 		return nil, err
 	}
 
-	profile.Games = map[string]faceit.GameInfo{
-		"cs2": {
-			SkillLevel: cs2Level,
-			FaceitElo:  cs2Elo,
-		},
+	p.Games = map[string]faceit.GameInfo{"cs2": {SkillLevel: cs2Level, FaceitElo: cs2Elo}}
+	p.Stats = &faceit.CS2Stats{Lifetime: faceit.LifetimeStats{AverageKD: kd, WinRate: winrate, Matches: matches}}
+
+	if rMatches > 0 {
+		p.Recent = &faceit.RecentForm{
+			MatchesAnalyzed:  rMatches,
+			AvgKills:         rKills,
+			AvgADR:           rADR,
+			AvgHSPercentage:  rHS,
+			AvgKRRatio:       rKR,
+			TotalEntryKills:  rEntry,
+			TotalSniperKills: rSniper,
+		}
 	}
 
-	// Відновлюємо розширену статистику
-	profile.Stats = &faceit.CS2Stats{
-		Lifetime: faceit.LifetimeStats{
-			AverageKD: kd,
-			WinRate:   winrate,
-			Matches:   matches,
-		},
-	}
-
-	return &profile, nil
+	return &p, nil
 }
