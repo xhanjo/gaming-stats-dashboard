@@ -63,7 +63,10 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
-	query := `SELECT player_id, nickname, cs2_level, cs2_elo FROM players WHERE nickname = ?`
+	query := `
+	SELECT player_id, nickname, cs2_level, cs2_elo 
+	FROM players 
+	WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
 	row := s.db.QueryRow(query, nickname)
 
