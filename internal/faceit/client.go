@@ -13,7 +13,7 @@ type PlayerProfile struct {
 	Nickname string              `json:"nickname"`
 	Games    map[string]GameInfo `json:"games"`
 	Stats    *CS2Stats           `json:"stats,omitempty"`
-	Recent   *RecentForm         `json:"recent_form, omitempty`
+	Recent   *RecentForm         `json:"recent_form,omitempty"`
 }
 
 type GameInfo struct {
