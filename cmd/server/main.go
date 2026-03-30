@@ -50,16 +50,17 @@ func main() {
 		profile, err := db.GetPlayer(nickname)
 
 		if err == nil {
-			log.Printf("Дані для [%s] взяті з нашої БАЗИ ДАНИХ (миттєво)", nickname)
+			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
 			json.NewEncoder(w).Encode(profile)
 			return
 		}
 
 		if err != sql.ErrNoRows {
-			log.Printf("Помилка читання з БД: %v", err)
+			log.Printf("ERROR: Помилка читання з БД: %v", err)
 		}
 
-		log.Printf("Гравця [%s] немає в базі, робимо запит до Faceit API...", nickname)
+		log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
+
 		profile, err = faceit.GetPlayerProfile(nickname, apiKey)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -67,11 +68,19 @@ func main() {
 			return
 		}
 
+		log.Printf("INFO: Отримуємо розширену статистику для ID: %s", profile.PlayerID)
+		stats, err := faceit.GetCS2Stats(profile.PlayerID, apiKey)
+		if err == nil {
+			profile.Stats = stats
+		} else {
+			log.Printf("WARN: Не вдалося отримати детальну статистику CS2 для [%s]: %v", nickname, err)
+		}
+
 		err = db.SavePlayer(profile)
 		if err != nil {
-			log.Printf("Помилка збереження в БД: %v", err)
+			log.Printf("ERROR: Помилка збереження в БД: %v", err)
 		} else {
-			log.Printf("Дані гравця [%s] успішно збережено в БД!", nickname)
+			log.Printf("INFO: Дані гравця [%s] успішно збережено в БД", nickname)
 		}
 
 		json.NewEncoder(w).Encode(profile)
