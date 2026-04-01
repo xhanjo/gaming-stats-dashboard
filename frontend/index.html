@@ -13,6 +13,7 @@
         .stat-row { display: flex; justify-content: space-between; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
         .error { color: #ff5500; display: none; margin-top: 10px;}
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -41,6 +42,9 @@
         <div class="stat-row"><span>Headshots:</span> <strong id="playerHS">-</strong></div>
         <div class="stat-row"><span>Entry Kills (всього):</span> <strong id="playerEntry">-</strong></div>
         <div class="stat-row"><span>Снайперських вбивств:</span> <strong id="playerSniper">-</strong></div>
+        
+        <h3 style="margin-top: 30px; border-bottom: 1px solid #333; padding-bottom: 10px;">Динаміка форми (ADR та Kills)</h3>
+        <canvas id="performanceChart" width="400" height="200"></canvas>
     </div>
 
     <script src="app.js"></script>

@@ -1,3 +1,5 @@
+let myChart = null; 
+
 async function searchPlayer() {
     const nickname = document.getElementById('nicknameInput').value.trim();
     const errorMsg = document.getElementById('errorMessage');
@@ -16,7 +18,6 @@ async function searchPlayer() {
             throw new Error(data.error || 'Гравця не знайдено');
         }
 
-        // Заповнюємо базові дані
         document.getElementById('playerName').textContent = data.nickname;
         
         if (data.games && data.games.cs2) {
@@ -37,6 +38,10 @@ async function searchPlayer() {
             document.getElementById('playerHS').textContent = data.recent_form.avg_hs_percentage.toFixed(1) + '%';
             document.getElementById('playerEntry').textContent = data.recent_form.total_entry_kills;
             document.getElementById('playerSniper').textContent = data.recent_form.total_sniper_kills;
+
+            if (data.recent_form.match_history && data.recent_form.match_history.length > 0) {
+                renderChart(data.recent_form.match_history);
+            }
         }
 
         card.style.display = 'block';
@@ -45,4 +50,64 @@ async function searchPlayer() {
         errorMsg.textContent = error.message;
         errorMsg.style.display = 'block';
     }
+}
+
+function renderChart(history) {
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+
+
+    const data = [...history].reverse(); 
+
+    const labels = data.map((_, index) => `Матч ${index + 1}`);
+    const adrValues = data.map(m => parseFloat(m.ADR));
+    const killValues = data.map(m => parseInt(m.Kills));
+
+    if (myChart) {
+        myChart.destroy();
+    }
+
+    myChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'ADR',
+                    data: adrValues,
+                    borderColor: '#ff5500',
+                    backgroundColor: 'rgba(255, 85, 0, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4, 
+                    fill: true
+                },
+                {
+                    label: 'Kills',
+                    data: killValues,
+                    borderColor: '#00aaff', 
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    tension: 0.4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    labels: { color: '#ffffff' } 
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#aaaaaa' },
+                    grid: { color: '#333333' } 
+                },
+                y: {
+                    ticks: { color: '#aaaaaa' },
+                    grid: { color: '#333333' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }

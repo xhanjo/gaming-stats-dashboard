@@ -74,13 +74,14 @@ type PlayerMatchStats struct {
 }
 
 type RecentForm struct {
-	MatchesAnalyzed  int     `json:"matches_analyzed"`
-	AvgKills         float64 `json:"avg_kills"`
-	AvgADR           float64 `json:"avg_adr"`
-	AvgHSPercentage  float64 `json:"avg_hs_percentage"`
-	AvgKRRatio       float64 `json:"avg_kr_ratio"`
-	TotalEntryKills  int     `json:"total_entry_kills"`
-	TotalSniperKills int     `json:"total_sniper_kills"`
+	MatchesAnalyzed  int                `json:"matches_analyzed"`
+	AvgKills         float64            `json:"avg_kills"`
+	AvgADR           float64            `json:"avg_adr"`
+	AvgHSPercentage  float64            `json:"avg_hs_percentage"`
+	AvgKRRatio       float64            `json:"avg_kr_ratio"`
+	TotalEntryKills  int                `json:"total_entry_kills"`
+	TotalSniperKills int                `json:"total_sniper_kills"`
+	MatchHistory     []PlayerMatchStats `json:"match_history"`
 }
 
 func GetPlayerProfile(nickname, apiKey string) (*PlayerProfile, error) {
@@ -229,12 +230,15 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 	var totalKills, totalADR, totalHS, totalKR float64
 	var totalEntry, totalSniper int
 	var successfulMatches int
+	var formHistory []PlayerMatchStats
 
 	for _, matchID := range matchIDs {
 		stats, err := GetMatchStatsForPlayer(matchID, playerID, apiKey)
 		if err != nil {
 			continue
 		}
+
+		formHistory = append(formHistory, *stats)
 
 		if val, err := strconv.ParseFloat(stats.Kills, 64); err == nil {
 			totalKills += val
@@ -270,6 +274,7 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 		AvgKRRatio:       totalKR / float64(successfulMatches),
 		TotalEntryKills:  totalEntry,
 		TotalSniperKills: totalSniper,
+		MatchHistory:     formHistory,
 	}
 
 	return form, nil

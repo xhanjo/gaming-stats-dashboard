@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
@@ -42,6 +43,7 @@ func (s *Storage) InitTable() error {
 		recent_avg_kr REAL,
 		recent_total_entry INTEGER,
 		recent_total_sniper INTEGER,
+		recent_history TEXT,
 		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -67,6 +69,7 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 
 	var rMatches, rEntry, rSniper int
 	var rKills, rADR, rHS, rKR float64
+	var historyJSON []byte
 
 	if profile.Recent != nil {
 		rMatches = profile.Recent.MatchesAnalyzed
@@ -76,30 +79,33 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		rKR = profile.Recent.AvgKRRatio
 		rEntry = profile.Recent.TotalEntryKills
 		rSniper = profile.Recent.TotalSniperKills
+
+		historyJSON, _ = json.Marshal(profile.Recent.MatchHistory)
 	}
 
 	query := `
 	INSERT INTO players (
 		player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
-		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(player_id) DO UPDATE SET
 		nickname = excluded.nickname, cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
 		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches,
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
 		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
 		recent_total_entry = excluded.recent_total_entry, recent_total_sniper = excluded.recent_total_sniper,
+		recent_history = excluded.recent_history,
 		last_updated = CURRENT_TIMESTAMP;`
 
 	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
-		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper)
+		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper, string(historyJSON))
 	return err
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	query := `
 	SELECT player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
-		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper
+		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
 	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
 	row := s.db.QueryRow(query, nickname)
@@ -109,9 +115,10 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	var kd, winrate, matches string
 	var rMatches, rEntry, rSniper int
 	var rKills, rADR, rHS, rKR float64
+	var historyText string
 
 	err := row.Scan(&p.PlayerID, &p.Nickname, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
-		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper)
+		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +127,11 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	p.Stats = &faceit.CS2Stats{Lifetime: faceit.LifetimeStats{AverageKD: kd, WinRate: winrate, Matches: matches}}
 
 	if rMatches > 0 {
+		var matchHistory []faceit.PlayerMatchStats
+		if historyText != "" {
+			json.Unmarshal([]byte(historyText), &matchHistory)
+		}
+
 		p.Recent = &faceit.RecentForm{
 			MatchesAnalyzed:  rMatches,
 			AvgKills:         rKills,
@@ -128,6 +140,7 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 			AvgKRRatio:       rKR,
 			TotalEntryKills:  rEntry,
 			TotalSniperKills: rSniper,
+			MatchHistory:     matchHistory, // Прикріплюємо відновлений масив
 		}
 	}
 
