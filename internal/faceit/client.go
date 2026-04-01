@@ -74,6 +74,8 @@ type PlayerMatchStats struct {
 	TripleKills string `json:"Triple Kills"`
 	SniperKills string `json:"Sniper Kills"`
 	KRRatio     string `json:"K/R Ratio"`
+	Result      string `json:"Result"`
+	I10         string `json:"i10"`
 }
 
 type RecentForm struct {
