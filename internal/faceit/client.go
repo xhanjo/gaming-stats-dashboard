@@ -43,24 +43,20 @@ type MatchStatsResponse struct {
 	Rounds []MatchRound `json:"rounds"`
 }
 
-// MatchRound містить дані про команди на карті
 type MatchRound struct {
 	Teams []MatchTeam `json:"teams"`
 }
 
-// MatchTeam містить список гравців однієї команди
 type MatchTeam struct {
 	Players []MatchPlayer `json:"players"`
 }
 
-// MatchPlayer об'єднує ID гравця та його особисту статистику
 type MatchPlayer struct {
 	PlayerID    string           `json:"player_id"`
 	Nickname    string           `json:"nickname"`
 	PlayerStats PlayerMatchStats `json:"player_stats"`
 }
 
-// PlayerMatchStats містить усі можливі детальні метрики за матч
 type PlayerMatchStats struct {
 	Kills       string `json:"Kills"`
 	Assists     string `json:"Assists"`

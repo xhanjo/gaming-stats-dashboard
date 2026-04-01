@@ -46,6 +46,7 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 
 		profile, err := db.GetPlayer(nickname)
 		if err == nil {

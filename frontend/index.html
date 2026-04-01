@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS2 stats Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px; }
+        .search-box { margin-bottom: 20px; }
+        input { padding: 10px; font-size: 16px; border: none; border-radius: 4px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #ff5500; border: none; color: white; border-radius: 4px; }
+        .card { background-color: #1e1e1e; padding: 20px; border-radius: 8px; max-width: 400px; display: none; margin-top: 20px;}
+        .stat-row { display: flex; justify-content: space-between; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .error { color: #ff5500; display: none; margin-top: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Аналітика гравців CS2</h1>
+    
+    <div class="search-box">
+        <input type="text" id="nicknameInput" placeholder="Введіть нікнейм Faceit...">
+        <button onclick="searchPlayer()">Знайти</button>
+    </div>
+
+    <div id="errorMessage" class="error"></div>
+
+    <div id="playerCard" class="card">
+        <h2 id="playerName">Nickname</h2>
+        <div class="stat-row"><span>Рівень:</span> <strong id="playerLevel">-</strong></div>
+        <div class="stat-row"><span>Elo:</span> <strong id="playerElo">-</strong></div>
+        
+        <h3>Загальна статистика (Lifetime)</h3>
+        <div class="stat-row"><span>Всього матчів:</span> <strong id="playerMatches">-</strong></div>
+        <div class="stat-row"><span>Win Rate:</span> <strong id="playerWinrate">-</strong></div>
+        
+        <h3>Форма (останні 20 матчів)</h3>
+        <div class="stat-row"><span>K/D:</span> <strong id="playerKD">-</strong></div>
+        <div class="stat-row"><span>K/R:</span> <strong id="playerKR">-</strong></div>
+        <div class="stat-row"><span>ADR:</span> <strong id="playerADR">-</strong></div>
+        <div class="stat-row"><span>Headshots:</span> <strong id="playerHS">-</strong></div>
+        <div class="stat-row"><span>Entry Kills (всього):</span> <strong id="playerEntry">-</strong></div>
+        <div class="stat-row"><span>Снайперських вбивств:</span> <strong id="playerSniper">-</strong></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
