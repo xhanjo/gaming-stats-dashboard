@@ -1,52 +1,259 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CS2 stats Dashboard</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #121212; color: #ffffff; padding: 20px; }
-        .search-box { margin-bottom: 20px; }
-        input { padding: 10px; font-size: 16px; border: none; border-radius: 4px; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #ff5500; border: none; color: white; border-radius: 4px; }
-        .card { background-color: #1e1e1e; padding: 20px; border-radius: 8px; max-width: 400px; display: none; margin-top: 20px;}
-        .stat-row { display: flex; justify-content: space-between; margin: 10px 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
-        .error { color: #ff5500; display: none; margin-top: 10px;}
-    </style>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CS2 Stats Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js/dist/chart.umd.min.js"></script>
-</head>
-<body>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              faceit: "#ff5500",
+              dark: "#121212",
+              card: "#1e1e1e",
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body
+    class="bg-dark text-gray-200 font-sans min-h-screen p-4 md:p-8 selection:bg-faceit selection:text-white"
+  >
+    <div class="max-w-5xl mx-auto">
+      <div
+        class="mb-10 text-center md:text-left flex flex-col md:flex-row justify-between items-center gap-6"
+      >
+        <div>
+          <h1 class="text-4xl font-extrabold text-white tracking-tight">
+            CS2 <span class="text-faceit">Analytics</span>
+          </h1>
+          <p class="text-gray-400 mt-2">Детальна статистика та форма гравців</p>
+        </div>
 
-    <h1>Аналітика гравців CS2</h1>
-    
-    <div class="search-box">
-        <input type="text" id="nicknameInput" placeholder="Введіть нікнейм Faceit...">
-        <button onclick="searchPlayer()">Знайти</button>
+        <div class="flex w-full md:w-auto shadow-lg rounded-lg overflow-hidden">
+          <input
+            type="text"
+            id="nicknameInput"
+            placeholder="Нікнейм на Faceit..."
+            class="w-full md:w-72 bg-card text-white px-4 py-3 outline-none border border-gray-700 focus:border-faceit transition-colors"
+          />
+          <button
+            onclick="searchPlayer()"
+            class="bg-faceit hover:bg-orange-600 text-white font-semibold px-6 py-3 transition-colors duration-200"
+          >
+            Знайти
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="errorMessage"
+        class="hidden bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-center font-medium"
+      ></div>
+
+      <div id="playerCard" class="hidden space-y-6">
+        <div
+          class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-4"
+        >
+          <h2
+            id="playerName"
+            class="text-3xl font-bold text-white tracking-wide"
+          >
+            Nickname
+          </h2>
+          <div class="flex gap-4">
+            <div
+              class="bg-gray-800 rounded-lg px-4 py-2 border border-gray-700 flex flex-col items-center"
+            >
+              <span
+                class="text-xs text-gray-400 uppercase tracking-wider font-semibold"
+                >Рівень</span
+              >
+              <span id="playerLevel" class="text-2xl font-bold text-faceit"
+                >-</span
+              >
+            </div>
+            <div
+              class="bg-gray-800 rounded-lg px-4 py-2 border border-gray-700 flex flex-col items-center"
+            >
+              <span
+                class="text-xs text-gray-400 uppercase tracking-wider font-semibold"
+                >Elo</span
+              >
+              <span id="playerElo" class="text-2xl font-bold text-white"
+                >-</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h3
+              class="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-3 mb-4 flex items-center gap-2"
+            >
+              <svg
+                class="w-5 h-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              Загальна статистика (Lifetime)
+            </h3>
+            <div class="space-y-4">
+              <div class="flex justify-between items-end">
+                <span class="text-gray-400">Всього матчів</span>
+                <strong id="playerMatches" class="text-xl text-white font-mono"
+                  >-</strong
+                >
+              </div>
+              <div class="flex justify-between items-end">
+                <span class="text-gray-400">Win Rate</span>
+                <strong
+                  id="playerWinrate"
+                  class="text-xl text-green-400 font-mono"
+                  >-</strong
+                >
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h3
+              class="text-lg font-semibold text-gray-300 border-b border-gray-700 pb-3 mb-4 flex items-center gap-2"
+            >
+              <svg
+                class="w-5 h-5 text-faceit"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                ></path>
+              </svg>
+              Форма (останні 20 матчів)
+            </h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">K/D Ratio</div>
+                <div id="playerKD" class="text-lg font-bold text-white">-</div>
+              </div>
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">K/R Ratio</div>
+                <div id="playerKR" class="text-lg font-bold text-white">-</div>
+              </div>
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">Середній ADR</div>
+                <div id="playerADR" class="text-lg font-bold text-faceit">
+                  -
+                </div>
+              </div>
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">Headshots</div>
+                <div id="playerHS" class="text-lg font-bold text-white">-</div>
+              </div>
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">Entry Kills</div>
+                <div id="playerEntry" class="text-lg font-bold text-blue-400">
+                  -
+                </div>
+              </div>
+              <div class="bg-gray-800/50 rounded p-3 border border-gray-700/50">
+                <div class="text-xs text-gray-500 mb-1">Снайпер</div>
+                <div id="playerSniper" class="text-lg font-bold text-green-400">
+                  -
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+          <div class="flex gap-2 mb-6">
+            <button
+              id="btn-kd"
+              onclick="changeChart('kd')"
+              class="px-5 py-1.5 rounded-full text-sm font-bold bg-faceit text-white transition-colors"
+            >
+              K/D
+            </button>
+            <button
+              id="btn-kr"
+              onclick="changeChart('kr')"
+              class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors"
+            >
+              K/R
+            </button>
+            <button
+              id="btn-hs"
+              onclick="changeChart('hs')"
+              class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors"
+            >
+              HS%
+            </button>
+            <button
+              id="btn-adr"
+              onclick="changeChart('adr')"
+              class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors"
+            >
+              ADR
+            </button>
+          </div>
+
+          <div class="flex flex-col lg:flex-row gap-4">
+            <div
+              class="flex-grow relative h-64 lg:h-80 border border-gray-800 rounded-lg p-4 bg-[#18181b]"
+            >
+              <canvas id="performanceChart"></canvas>
+            </div>
+
+            <div
+              class="w-full lg:w-48 bg-[#18181b] border border-gray-800 rounded-lg p-5 flex flex-col justify-between"
+            >
+              <div>
+                <div
+                  id="panelCurrentVal"
+                  class="text-3xl font-bold text-white mb-1"
+                >
+                  -
+                </div>
+                <div
+                  id="panelMetricName"
+                  class="text-sm font-bold text-gray-400"
+                >
+                  K/D
+                </div>
+              </div>
+              <div class="space-y-3 text-sm mt-8">
+                <div class="flex justify-between border-b border-gray-800 pb-2">
+                  <span class="text-gray-400">Highest</span>
+                  <span id="panelHighVal" class="text-white font-bold">-</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-gray-400">Lowest</span>
+                  <span id="panelLowVal" class="text-white font-bold">-</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-
-    <div id="errorMessage" class="error"></div>
-
-    <div id="playerCard" class="card">
-        <h2 id="playerName">Nickname</h2>
-        <div class="stat-row"><span>Рівень:</span> <strong id="playerLevel">-</strong></div>
-        <div class="stat-row"><span>Elo:</span> <strong id="playerElo">-</strong></div>
-        
-        <h3>Загальна статистика (Lifetime)</h3>
-        <div class="stat-row"><span>Всього матчів:</span> <strong id="playerMatches">-</strong></div>
-        <div class="stat-row"><span>Win Rate:</span> <strong id="playerWinrate">-</strong></div>
-        
-        <h3>Форма (останні 20 матчів)</h3>
-        <div class="stat-row"><span>K/D:</span> <strong id="playerKD">-</strong></div>
-        <div class="stat-row"><span>K/R:</span> <strong id="playerKR">-</strong></div>
-        <div class="stat-row"><span>ADR:</span> <strong id="playerADR">-</strong></div>
-        <div class="stat-row"><span>Headshots:</span> <strong id="playerHS">-</strong></div>
-        <div class="stat-row"><span>Entry Kills (всього):</span> <strong id="playerEntry">-</strong></div>
-        <div class="stat-row"><span>Снайперських вбивств:</span> <strong id="playerSniper">-</strong></div>
-        
-        <h3 style="margin-top: 30px; border-bottom: 1px solid #333; padding-bottom: 10px;">Динаміка форми (ADR та Kills)</h3>
-        <canvas id="performanceChart" width="400" height="200"></canvas>
-    </div>
-
     <script src="app.js"></script>
-</body>
+  </body>
 </html>
