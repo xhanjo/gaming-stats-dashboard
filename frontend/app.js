@@ -29,8 +29,7 @@ async function searchPlayer() {
             document.getElementById('playerWinrate').textContent = data.stats.lifetime["Win Rate %"] + "%";
         }
 
-if (data.recent_form) {
-            // 1. РАХУЄМО ПРАВИЛЬНИЙ K/D (Сума Kills / Сума Deaths)
+        if (data.recent_form) {
             let totalKills = 0;
             let totalDeaths = 0;
             
@@ -41,10 +40,8 @@ if (data.recent_form) {
                 });
             }
             
-            // Захист від ділення на нуль
             const trueKD = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : "0.00";
 
-            // 2. Виводимо дані на екран
             document.getElementById('playerKD').textContent = trueKD;
             document.getElementById('playerKR').textContent = data.recent_form.avg_kr_ratio.toFixed(2);
             document.getElementById('playerADR').textContent = data.recent_form.avg_adr.toFixed(1);
@@ -52,7 +49,6 @@ if (data.recent_form) {
             document.getElementById('playerEntry').textContent = data.recent_form.total_entry_kills;
             document.getElementById('playerSniper').textContent = data.recent_form.total_sniper_kills;
 
-            // Зберігаємо історію і малюємо графік
             if (data.recent_form.match_history && data.recent_form.match_history.length > 0) {
                 currentMatchHistory = [...data.recent_form.match_history].reverse();
                 changeChart('kd'); 
@@ -67,11 +63,9 @@ if (data.recent_form) {
     }
 }
 
-// Нова функція для перемикання метрик графіка
 function changeChart(metric) {
     if (!currentMatchHistory.length) return;
 
-    // 1. Оновлюємо кольори кнопок (робимо активну помаранчевою)
     const btns = ['kd', 'kr', 'hs', 'adr'];
     btns.forEach(b => {
         const el = document.getElementById(`btn-${b}`);
@@ -82,17 +76,15 @@ function changeChart(metric) {
         }
     });
 
-    // 2. Готуємо дані залежно від обраної метрики
-    // Faceit малює просто номери по осі X (1, 13, 25...)
+
     const labels = currentMatchHistory.map((_, i) => `${i + 1}`); 
     let dataPoints = [];
     let metricLabel = "";
 
-    // Витягуємо правильні цифри з нашого JSON
     if (metric === 'kd') {
         dataPoints = currentMatchHistory.map(m => {
             const kills = parseInt(m.Kills);
-            const deaths = parseInt(m.Deaths) || 1; // Захист від ділення на нуль
+            const deaths = parseInt(m.Deaths) || 1;
             return parseFloat((kills / deaths).toFixed(2));
         });
         metricLabel = "K/D";
@@ -107,19 +99,16 @@ function changeChart(metric) {
         metricLabel = "ADR";
     }
 
-    // 3. Рахуємо статистику для бокової панелі
     const maxVal = Math.max(...dataPoints);
     const minVal = Math.min(...dataPoints);
     const avgVal = dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length;
 
-    // Оновлюємо текст у боковій панелі
     const suffix = metric === 'hs' ? '%' : '';
     document.getElementById('panelMetricName').textContent = metricLabel;
     document.getElementById('panelCurrentVal').textContent = avgVal.toFixed(2) + suffix;
     document.getElementById('panelHighVal').textContent = metric === 'hs' ? maxVal.toFixed(0) + suffix : maxVal.toFixed(2);
     document.getElementById('panelLowVal').textContent = metric === 'hs' ? minVal.toFixed(0) + suffix : minVal.toFixed(2);
 
-    // 4. Малюємо новий графік
     if (myChart) myChart.destroy();
     const ctx = document.getElementById('performanceChart').getContext('2d');
 
@@ -130,24 +119,24 @@ function changeChart(metric) {
             datasets: [{
                 label: metricLabel,
                 data: dataPoints,
-                borderColor: '#6366f1', // Фіолетово-синій відтінок (Indigo) як на скріншоті Faceit
+                borderColor: '#6366f1', 
                 borderWidth: 2,
                 pointBackgroundColor: '#6366f1',
-                pointRadius: 0, // Ховаємо точки, щоб лінія була суцільною
-                pointHoverRadius: 6, // Показуємо точку тільки при наведенні мишки
-                tension: 0.1 // Робимо лінії гострими, а не хвилястими
+                pointRadius: 0, 
+                pointHoverRadius: 6, 
+                tension: 0.1
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { display: false }, // Ховаємо легенду зверху
+                legend: { display: false }, 
                 tooltip: {
                     backgroundColor: 'rgba(0,0,0,0.8)',
                     titleColor: '#aaa',
                     bodyFont: { size: 16, weight: 'bold' },
-                    displayColors: false // Ховаємо кольоровий квадратик в тултипі
+                    displayColors: false 
                 }
             },
             interaction: {
@@ -156,11 +145,11 @@ function changeChart(metric) {
             },
             scales: {
                 x: {
-                    grid: { color: '#27272a', drawBorder: false }, // Темна сітка
-                    ticks: { color: '#71717a', maxTicksLimit: 10 } // Показуємо не всі номери матчів
+                    grid: { color: '#27272a', drawBorder: false }, 
+                    ticks: { color: '#71717a', maxTicksLimit: 10 }
                 },
                 y: {
-                    grid: { color: '#27272a', borderDash: [5, 5], drawBorder: false }, // Пунктирна лінія сітки
+                    grid: { color: '#27272a', borderDash: [5, 5], drawBorder: false }, 
                     ticks: { color: '#71717a' },
                     beginAtZero: true
                 }
