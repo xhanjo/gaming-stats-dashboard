@@ -18,11 +18,9 @@ func New(dbPath string) (*Storage, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	if err := db.Ping(); err != nil {
 		return nil, err
 	}
-
 	return &Storage{db: db}, nil
 }
 
@@ -31,6 +29,8 @@ func (s *Storage) InitTable() error {
 	CREATE TABLE IF NOT EXISTS players (
 		player_id TEXT PRIMARY KEY,
 		nickname TEXT UNIQUE NOT NULL,
+		avatar TEXT,
+		steam_id TEXT,
 		cs2_level INTEGER,
 		cs2_elo INTEGER,
 		cs2_kd TEXT,
@@ -79,17 +79,17 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		rKR = profile.Recent.AvgKRRatio
 		rEntry = profile.Recent.TotalEntryKills
 		rSniper = profile.Recent.TotalSniperKills
-
 		historyJSON, _ = json.Marshal(profile.Recent.MatchHistory)
 	}
 
 	query := `
 	INSERT INTO players (
-		player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+		player_id, nickname, avatar, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(player_id) DO UPDATE SET
-		nickname = excluded.nickname, cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
+		nickname = excluded.nickname, avatar = excluded.avatar, steam_id = excluded.steam_id,
+		cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
 		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches,
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
 		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
@@ -97,14 +97,14 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		recent_history = excluded.recent_history,
 		last_updated = CURRENT_TIMESTAMP;`
 
-	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
+	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
 		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper, string(historyJSON))
 	return err
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	query := `
-	SELECT player_id, nickname, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+	SELECT player_id, nickname, avatar, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
 	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
@@ -117,7 +117,7 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	var rKills, rADR, rHS, rKR float64
 	var historyText string
 
-	err := row.Scan(&p.PlayerID, &p.Nickname, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
+	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
 		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText)
 	if err != nil {
 		return nil, err
@@ -131,16 +131,10 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 		if historyText != "" {
 			json.Unmarshal([]byte(historyText), &matchHistory)
 		}
-
 		p.Recent = &faceit.RecentForm{
-			MatchesAnalyzed:  rMatches,
-			AvgKills:         rKills,
-			AvgADR:           rADR,
-			AvgHSPercentage:  rHS,
-			AvgKRRatio:       rKR,
-			TotalEntryKills:  rEntry,
-			TotalSniperKills: rSniper,
-			MatchHistory:     matchHistory, // Прикріплюємо відновлений масив
+			MatchesAnalyzed: rMatches, AvgKills: rKills, AvgADR: rADR,
+			AvgHSPercentage: rHS, AvgKRRatio: rKR, TotalEntryKills: rEntry, TotalSniperKills: rSniper,
+			MatchHistory: matchHistory,
 		}
 	}
 

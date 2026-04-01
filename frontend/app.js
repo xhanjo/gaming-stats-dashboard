@@ -1,5 +1,5 @@
 let myChart = null;
-let currentMatchHistory = []; // Зберігаємо історію тут, щоб перемикати графіки без запитів до API
+let currentMatchHistory = []; 
 
 async function searchPlayer() {
     const nickname = document.getElementById('nicknameInput').value.trim();
@@ -18,7 +18,28 @@ async function searchPlayer() {
         if (!response.ok) throw new Error(data.error || 'Гравця не знайдено');
 
         document.getElementById('playerName').textContent = data.nickname;
+        const avatarImg = document.getElementById('playerAvatar');
+        const avatarFallback = document.getElementById('playerAvatarFallback');
         
+        if (data.avatar && data.avatar !== "") {
+            avatarImg.src = data.avatar;
+            avatarImg.classList.remove('hidden');
+            avatarFallback.classList.add('hidden');
+        } else {
+            avatarImg.classList.add('hidden');
+            avatarFallback.classList.remove('hidden');
+        }
+
+        document.getElementById('linkFaceit').href = `https://www.faceit.com/en/players/${data.nickname}`;
+        
+        const steamLink = document.getElementById('linkSteam');
+        if (data.steam_id_64 && data.steam_id_64 !== "") {
+            steamLink.href = `https://steamcommunity.com/profiles/${data.steam_id_64}`;
+            steamLink.style.display = 'flex';
+        } else {
+            steamLink.style.display = 'none'; 
+        }
+
         if (data.games && data.games.cs2) {
             document.getElementById('playerLevel').textContent = data.games.cs2.skill_level;
             document.getElementById('playerElo').textContent = data.games.cs2.faceit_elo;

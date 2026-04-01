@@ -11,10 +11,8 @@ import (
 	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
 
-// GetPlayerStats повертає HTTP-обробник, який має доступ до БД та API-ключа
 func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Дозволяємо запити з фронтенду
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 
@@ -25,7 +23,6 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 			return
 		}
 
-		// 1. СПОЧАТКУ ШУКАЄМО В БАЗІ ДАНИХ
 		profile, err := db.GetPlayer(nickname)
 		if err == nil {
 			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
@@ -37,7 +34,6 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 			log.Printf("ERROR: Помилка читання з БД: %v", err)
 		}
 
-		// 2. ЯКЩО В БАЗІ НЕМАЄ АБО КЕШ ЗАСТАРІВ — ЙДЕМО НА FACEIT
 		log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
 
 		profile, err = faceit.GetPlayerProfile(nickname, apiKey)
@@ -62,7 +58,6 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Не вдалося розрахувати форму: %v", err)
 		}
 
-		// 3. ЗБЕРІГАЄМО ВСЕ РАЗОМ В БАЗУ ДАНИХ
 		err = db.SavePlayer(profile)
 		if err != nil {
 			log.Printf("ERROR: Помилка збереження в БД: %v", err)
@@ -70,7 +65,6 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 			log.Printf("INFO: Дані гравця [%s] збережено в БД", nickname)
 		}
 
-		// 4. ВІДДАЄМО ДАНІ КОРИСТУВАЧУ
 		json.NewEncoder(w).Encode(profile)
 	}
 }
