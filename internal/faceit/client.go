@@ -12,6 +12,7 @@ type PlayerProfile struct {
 	PlayerID string              `json:"player_id"`
 	Nickname string              `json:"nickname"`
 	Avatar   string              `json:"avatar"`
+	Country  string              `json:"country"`
 	SteamID  string              `json:"steam_id_64"`
 	Games    map[string]GameInfo `json:"games"`
 	Stats    *CS2Stats           `json:"stats,omitempty"`

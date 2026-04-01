@@ -30,6 +30,7 @@ func (s *Storage) InitTable() error {
 		player_id TEXT PRIMARY KEY,
 		nickname TEXT UNIQUE NOT NULL,
 		avatar TEXT,
+		country TEXT,
 		steam_id TEXT,
 		cs2_level INTEGER,
 		cs2_elo INTEGER,
@@ -84,11 +85,11 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 
 	query := `
 	INSERT INTO players (
-		player_id, nickname, avatar, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+		player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(player_id) DO UPDATE SET
-		nickname = excluded.nickname, avatar = excluded.avatar, steam_id = excluded.steam_id,
+		nickname = excluded.nickname, avatar = excluded.avatar, country = excluded.country, steam_id = excluded.steam_id,
 		cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
 		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches,
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
@@ -97,14 +98,14 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		recent_history = excluded.recent_history,
 		last_updated = CURRENT_TIMESTAMP;`
 
-	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
+	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
 		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper, string(historyJSON))
 	return err
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	query := `
-	SELECT player_id, nickname, avatar, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
 	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
@@ -117,7 +118,7 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	var rKills, rADR, rHS, rKR float64
 	var historyText string
 
-	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
+	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.Country, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
 		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText)
 	if err != nil {
 		return nil, err
