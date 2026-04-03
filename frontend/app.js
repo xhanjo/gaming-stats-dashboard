@@ -156,7 +156,7 @@ async function searchPlayer(event) {
                         const mapKD = parseFloat(mapData.stats["Average K/D Ratio"] || 0).toFixed(2);
                         
                         const wrColor = winRate >= 50 ? 'bg-green-500' : 'bg-red-500';
-                        const barWidth = Math.max(winRate, 5); 
+                        const barWidth = winRate; 
 
                         const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
 
