@@ -374,43 +374,65 @@ function renderPlayActivity(matches) {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#71717a' } }, y: { display: false, beginAtZero: true } } }
     });
 
-    // 🔥 HEATMAP КАЛЕНДАР (З підказками при наведенні) 🔥
+// 🔥 HEATMAP КАЛЕНДАР ПО МІСЯЦЯХ (Останні 6 місяців, заповнені до кінця) 🔥
     const heatmapGrid = document.getElementById('heatmapGrid');
     heatmapGrid.innerHTML = '';
+    // Додаємо класи для рівномірного розтягування місяців по всій ширині
+    heatmapGrid.className = 'flex flex-1 justify-between gap-4 w-full'; 
     
-    let todayDayIndex = (now.getDay() + 6) % 7; 
-    let endOfThisWeek = new Date(now);
-    endOfThisWeek.setDate(now.getDate() + (6 - todayDayIndex));
-    endOfThisWeek.setHours(23, 59, 59, 999); 
-    
-    let startOfCalendar = new Date(endOfThisWeek);
-    startOfCalendar.setDate(endOfThisWeek.getDate() - 363);
-    startOfCalendar.setHours(0, 0, 0, 0);
+    let currentYear = now.getFullYear();
+    let currentMonth = now.getMonth();
 
-    for (let i = 0; i < 364; i++) {
-        let cellDate = new Date(startOfCalendar);
-        cellDate.setDate(startOfCalendar.getDate() + i);
+    // Беремо останні 6 місяців (від 5 до 0)
+    for (let i = 5; i >= 0; i--) {
+        let monthDate = new Date(currentYear, currentMonth - i, 1);
+        let year = monthDate.getFullYear();
+        let monthIndex = monthDate.getMonth();
 
-        let dateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`;
-        let cell = document.createElement('div');
-        
-        if (cellDate.getTime() > now.getTime() && dateStr !== todayStr) {
-            cell.className = 'w-3 h-3 rounded-sm opacity-0 pointer-events-none';
-        } else {
+        let monthName = monthDate.toLocaleString('en-US', { month: 'long' });
+        let headerText = (monthIndex === 0) ? `<span class="text-white">${year}</span> ${monthName}` : monthName;
+
+        let daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+        let firstDayOfWeek = monthDate.getDay();
+        let startPad = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Пн=0, Нд=6
+
+        let monthHtml = `
+        <div class="flex flex-col flex-1">
+            <span class="text-[10px] font-bold text-gray-400 mb-2 border-b border-gray-800 pb-1 tracking-wider whitespace-nowrap">${headerText}</span>
+            <div class="grid grid-rows-7 grid-flow-col gap-1 md:gap-1.5">
+        `;
+
+        // Відступ для початку місяця
+        for (let p = 0; p < startPad; p++) {
+            monthHtml += `<div class="w-3 h-3 md:w-3.5 md:h-3.5"></div>`;
+        }
+
+        // Дні місяця
+        for (let d = 1; d <= daysInMonth; d++) {
+            let cellDate = new Date(year, monthIndex, d);
+
+            // Якщо дата в майбутньому — малюємо напівпрозорий порожній квадратик без підказок
+            if (cellDate > now) {
+                monthHtml += `<div class="w-3 h-3 md:w-3.5 md:h-3.5 rounded-sm bg-[#18181b] border border-gray-800/50 opacity-40 pointer-events-none"></div>`;
+                continue; 
+            }
+
+            let dateStr = `${year}-${String(monthIndex+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             let count = matchCountsByDate[dateStr] || 0;
-            
-            let colorClass = 'bg-[#18181b] border border-gray-800/50'; 
-            if (count >= 5) colorClass = 'bg-[#d946ef]'; 
-            else if (count >= 3) colorClass = 'bg-[#a21caf]'; 
-            else if (count >= 1) colorClass = 'bg-[#6b21a8]'; 
+
+            let colorClass = 'bg-[#18181b] border border-gray-800/50';
+            if (count >= 5) colorClass = 'bg-[#d946ef]';
+            else if (count >= 3) colorClass = 'bg-[#a21caf]';
+            else if (count >= 1) colorClass = 'bg-[#6b21a8]';
 
             let niceDate = cellDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' });
-            
-            cell.className = `w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-125 hover:z-10 relative cursor-crosshair`;
-            cell.title = count > 0 ? `${niceDate}: ігор — ${count}` : `${niceDate}: немає ігор`;
+            let title = count > 0 ? `${niceDate}: ігор — ${count}` : `${niceDate}: немає ігор`;
+
+            monthHtml += `<div class="w-3 h-3 md:w-3.5 md:h-3.5 rounded-sm ${colorClass} transition-all hover:scale-125 hover:z-10 relative cursor-crosshair" title="${title}"></div>`;
         }
-        
-        heatmapGrid.appendChild(cell);
+
+        monthHtml += `</div></div>`;
+        heatmapGrid.innerHTML += monthHtml;
     }
 }
 
