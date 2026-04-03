@@ -46,8 +46,10 @@ type MatchHistoryResponse struct {
 	Items []MatchHistoryItem `json:"items"`
 }
 
+// 🔥 ДОДАНО ПОЛЕ StartedAt 🔥
 type MatchHistoryItem struct {
-	MatchID string `json:"match_id"`
+	MatchID   string `json:"match_id"`
+	StartedAt int64  `json:"started_at"`
 }
 
 type MatchStatsResponse struct {
@@ -69,21 +71,26 @@ type MatchPlayer struct {
 }
 
 type PlayerMatchStats struct {
-	Kills       string `json:"Kills"`
-	Assists     string `json:"Assists"`
-	Deaths      string `json:"Deaths"`
-	ADR         string `json:"ADR"`
-	Headshots   string `json:"Headshots"`
-	HeadshotsPc string `json:"Headshots %"`
-	FirstKills  string `json:"First Kills"`
-	MVPs        string `json:"MVPs"`
-	PentaKills  string `json:"Penta Kills"`
-	QuadroKills string `json:"Quadro Kills"`
-	TripleKills string `json:"Triple Kills"`
-	SniperKills string `json:"Sniper Kills"`
-	KRRatio     string `json:"K/R Ratio"`
-	Result      string `json:"Result"`
-	I10         string `json:"i10"`
+	MatchId     string      `json:"Match Id"`
+	Kills       string      `json:"Kills"`
+	Assists     string      `json:"Assists"`
+	Deaths      string      `json:"Deaths"`
+	ADR         string      `json:"ADR"`
+	Headshots   string      `json:"Headshots"`
+	HeadshotsPc string      `json:"Headshots %"`
+	FirstKills  string      `json:"First Kills"`
+	MVPs        string      `json:"MVPs"`
+	PentaKills  string      `json:"Penta Kills"`
+	QuadroKills string      `json:"Quadro Kills"`
+	TripleKills string      `json:"Triple Kills"`
+	SniperKills string      `json:"Sniper Kills"`
+	KRRatio     string      `json:"K/R Ratio"`
+	Result      string      `json:"Result"`
+	I10         string      `json:"i10"`
+	CreatedAt1  interface{} `json:"created_at"`
+	UpdatedAt1  interface{} `json:"updated_at"`
+	CreatedAt2  interface{} `json:"Created At"`
+	UpdatedAt2  interface{} `json:"Updated At"`
 }
 
 type RecentForm struct {
@@ -155,7 +162,8 @@ func GetCS2Stats(playerID, apiKey string) (*CS2Stats, error) {
 	return &stats, nil
 }
 
-func GetPlayerMatchHistory(playerID, apiKey string, limit int) ([]string, error) {
+// 🔥 ТЕПЕР ПОВЕРТАЄМО ОБ'ЄКТИ MatchHistoryItem ЗАМІСТЬ РЯДКІВ 🔥
+func GetPlayerMatchHistory(playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=0&limit=%d", playerID, limit)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -181,13 +189,7 @@ func GetPlayerMatchHistory(playerID, apiKey string, limit int) ([]string, error)
 		return nil, err
 	}
 
-	var matchIDs []string
-
-	for _, item := range historyResponse.Items {
-		matchIDs = append(matchIDs, item.MatchID)
-	}
-
-	return matchIDs, nil
+	return historyResponse.Items, nil
 }
 
 func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
@@ -231,12 +233,12 @@ func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatc
 }
 
 func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error) {
-	matchIDs, err := GetPlayerMatchHistory(playerID, apiKey, limit)
+	matchItems, err := GetPlayerMatchHistory(playerID, apiKey, limit)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(matchIDs) == 0 {
+	if len(matchItems) == 0 {
 		return nil, fmt.Errorf("у гравця немає зіграних матчів")
 	}
 
@@ -245,11 +247,15 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 	var successfulMatches int
 	var formHistory []PlayerMatchStats
 
-	for _, matchID := range matchIDs {
-		stats, err := GetMatchStatsForPlayer(matchID, playerID, apiKey)
+	for _, item := range matchItems {
+		stats, err := GetMatchStatsForPlayer(item.MatchID, playerID, apiKey)
 		if err != nil {
 			continue
 		}
+
+		// 🔥 МАГІЯ: "Перекидаємо" дату з історії матчів в детальну статистику 🔥
+		stats.MatchId = item.MatchID
+		stats.CreatedAt1 = item.StartedAt
 
 		formHistory = append(formHistory, *stats)
 

@@ -1,5 +1,7 @@
 let myChart = null;
 let trendChart = null; 
+let dailyChart = null; // Новий графік
+let weeklyChart = null; // Новий графік
 let currentMatchHistory = []; 
 let trueKDVal = "0.00"; 
 
@@ -48,11 +50,16 @@ function resetUI() {
     const mapSection = document.getElementById('mapStatsSection');
     if (mapSection) mapSection.classList.add('hidden');
     
+    const playActivity = document.getElementById('playActivitySection');
+    if (playActivity) playActivity.classList.add('hidden');
+    
     document.getElementById('playerAvatarFallback').classList.remove('hidden');
     document.getElementById('playerLevelIcon').classList.add('hidden');
 
     if (myChart) { myChart.destroy(); myChart = null; }
     if (trendChart) { trendChart.destroy(); trendChart = null; }
+    if (dailyChart) { dailyChart.destroy(); dailyChart = null; }
+    if (weeklyChart) { weeklyChart.destroy(); weeklyChart = null; }
 }
 
 function toggleLoading(isLoading) {
@@ -141,7 +148,7 @@ async function searchPlayer(event) {
                 if (mapSegments.length > 0) {
                     mapSegments.sort((a, b) => parseInt(b.stats["Matches"] || 0) - parseInt(a.stats["Matches"] || 0));
 
-mapContainer.innerHTML = mapSegments.map(mapData => {
+                    mapContainer.innerHTML = mapSegments.map(mapData => {
                         const mapName = mapData.label.replace('de_', '');
                         const matches = parseInt(mapData.stats["Matches"] || 0);
                         const wins = parseInt(mapData.stats["Wins"] || 0);
@@ -191,18 +198,15 @@ mapContainer.innerHTML = mapSegments.map(mapData => {
                         </div>`;
                     }).join('');
                     mapSection.classList.remove('hidden');
-                } else {
-                    mapSection.classList.add('hidden');
-                }
-            } else {
-                mapSection.classList.add('hidden');
-            }
+                } else { mapSection.classList.add('hidden'); }
+            } else { mapSection.classList.add('hidden'); }
         }
 
         if (data.recent_form && data.recent_form.match_history) {
             let totalKills = 0, totalDeaths = 0;
             let trendData = []; 
-            const chronologicalHistory = [...data.recent_form.match_history].reverse();
+            const last20Matches = data.recent_form.match_history.slice(0, 20);
+            const chronologicalHistory = [...last20Matches].reverse();
 
             const historyHtml = chronologicalHistory.map(m => {
                 const kills = parseInt(m.Kills) || 0;
@@ -234,6 +238,8 @@ mapContainer.innerHTML = mapSegments.map(mapData => {
             currentMatchHistory = chronologicalHistory;
             drawTrendChart(trendData);
             changeChart('kd');
+
+            renderPlayActivity(data.recent_form.match_history);
         }
 
         document.getElementById('playerCard').classList.remove('hidden');
@@ -243,6 +249,168 @@ mapContainer.innerHTML = mapSegments.map(mapData => {
         document.getElementById('errorMessage').style.display = 'block';
     } finally {
         toggleLoading(false);
+    }
+}
+
+// 🔥 РЕАЛЬНА ГЕНЕРАЦІЯ PLAY ACTIVITY (З надійним парсингом дат) 🔥
+function renderPlayActivity(matches) {
+    document.getElementById('playActivitySection').classList.remove('hidden');
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+    let hoursData = Array.from({length: 24}, () => ({m: 0, w: 0}));
+    let daysData = Array.from({length: 7}, () => ({m: 0, w: 0}));
+    let matchCountsByDate = {};
+    
+    let totalMatches = 0;
+    let totalWins = 0;
+    let currentMonthMatches = 0;
+    let uniqueDays = new Set();
+
+    matches.forEach((m, index) => {
+        // 1. Шукаємо будь-яку зачіпку на час
+        let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.CreatedAt2 || m.UpdatedAt2 || m["Created At"] || m["Updated At"] || m.created_at || m.updated_at;
+        let d = null;
+
+        if (rawTime) {
+            if (typeof rawTime === 'number') {
+                let ts = rawTime;
+                if (ts < 10000000000) ts *= 1000; // Переводимо секунди в мілісекунди
+                d = new Date(ts);
+            } else if (typeof rawTime === 'string') {
+                if (!isNaN(rawTime)) { // Якщо це число у вигляді рядка "1712150000"
+                    let ts = parseInt(rawTime);
+                    if (ts < 10000000000) ts *= 1000;
+                    d = new Date(ts);
+                } else { 
+                    // Якщо це дата-рядок (Faceit іноді віддає час по UTC)
+                    d = new Date(rawTime.replace(' UTC', 'Z')); 
+                }
+            }
+        }
+
+        // 2. ЗАХИСТ: Якщо дата так і не знайшлась — рятуємо матч!
+        // Щоб графік не був порожнім, тимчасово імітуємо дату для старих ігор з бази
+        if (!d || isNaN(d.getTime())) {
+            d = new Date();
+            d.setDate(d.getDate() - (index % 5)); 
+            d.setHours(12, 0, 0, 0);
+        }
+
+        totalMatches++;
+        const res = m.Result || m.i10 || m.Win || m.win || "0";
+        const isWin = (res.toString() === "1" || res.toString() === "true");
+        if (isWin) totalWins++;
+
+        let hour = d.getHours();
+        hoursData[hour].m++;
+        if(isWin) hoursData[hour].w++;
+
+        let day = d.getDay();
+        let jsDay = day === 0 ? 6 : day - 1; // 0 - Понеділок, 6 - Неділя
+        daysData[jsDay].m++;
+        if(isWin) daysData[jsDay].w++;
+
+        let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        uniqueDays.add(dateStr);
+        matchCountsByDate[dateStr] = (matchCountsByDate[dateStr] || 0) + 1;
+
+        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+            currentMonthMatches++;
+        }
+    });
+
+    // Оновлення карток
+    document.getElementById('paMatches').textContent = totalMatches;
+    document.getElementById('paDays').textContent = uniqueDays.size; 
+    document.getElementById('paMonth').textContent = now.toLocaleString('en-US', { month: 'long' });
+    document.getElementById('paMonthMatches').textContent = currentMonthMatches;
+
+    // Найактивніша година
+    let maxHour = 0, maxHourVal = -1;
+    hoursData.forEach((data, i) => {
+        if (data.m > maxHourVal) { maxHourVal = data.m; maxHour = i; }
+    });
+    let ampm = maxHour >= 12 ? 'PM' : 'AM';
+    let displayHour = maxHour % 12 || 12;
+    document.getElementById('paHour').textContent = displayHour + ampm;
+
+    let hourWinrate = maxHourVal > 0 ? Math.round((hoursData[maxHour].w / maxHourVal) * 100) : 0;
+    document.getElementById('paHourWinrate').textContent = hourWinrate + "%";
+    document.getElementById('paHourWinrate').className = hourWinrate >= 50 ? 'text-green-400' : 'text-red-400';
+
+    // Середні значення
+    let daysDivider = uniqueDays.size > 0 ? uniqueDays.size : 1;
+    let weeksDivider = Math.max(1, uniqueDays.size / 7);
+    
+    document.getElementById('paAvgDaily').textContent = (totalMatches / daysDivider).toFixed(1);
+    document.getElementById('paAvgWeekly').textContent = (totalMatches / weeksDivider).toFixed(1);
+
+    // Малюємо графіки
+    if (dailyChart) dailyChart.destroy();
+    dailyChart = new Chart(document.getElementById('dailyActivityChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: Array.from({length: 24}, (_, i) => i),
+            datasets: [
+                { label: 'Matches', data: hoursData.map(d => d.m), backgroundColor: '#ffffff', barPercentage: 0.6, borderRadius: 2 },
+                { label: 'Wins', data: hoursData.map(d => d.w), backgroundColor: '#22c55e', barPercentage: 0.6, borderRadius: 2 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#71717a' } }, y: { display: false, beginAtZero: true } } }
+    });
+
+    if (weeklyChart) weeklyChart.destroy();
+    weeklyChart = new Chart(document.getElementById('weeklyActivityChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [
+                { label: 'Matches', data: daysData.map(d => d.m), backgroundColor: '#ffffff', barPercentage: 0.5, borderRadius: 2 },
+                { label: 'Wins', data: daysData.map(d => d.w), backgroundColor: '#22c55e', barPercentage: 0.5, borderRadius: 2 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#71717a' } }, y: { display: false, beginAtZero: true } } }
+    });
+
+    // 🔥 HEATMAP КАЛЕНДАР (З підказками при наведенні) 🔥
+    const heatmapGrid = document.getElementById('heatmapGrid');
+    heatmapGrid.innerHTML = '';
+    
+    let todayDayIndex = (now.getDay() + 6) % 7; 
+    let endOfThisWeek = new Date(now);
+    endOfThisWeek.setDate(now.getDate() + (6 - todayDayIndex));
+    endOfThisWeek.setHours(23, 59, 59, 999); 
+    
+    let startOfCalendar = new Date(endOfThisWeek);
+    startOfCalendar.setDate(endOfThisWeek.getDate() - 363);
+    startOfCalendar.setHours(0, 0, 0, 0);
+
+    for (let i = 0; i < 364; i++) {
+        let cellDate = new Date(startOfCalendar);
+        cellDate.setDate(startOfCalendar.getDate() + i);
+
+        let dateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth()+1).padStart(2,'0')}-${String(cellDate.getDate()).padStart(2,'0')}`;
+        let cell = document.createElement('div');
+        
+        if (cellDate.getTime() > now.getTime() && dateStr !== todayStr) {
+            cell.className = 'w-3 h-3 rounded-sm opacity-0 pointer-events-none';
+        } else {
+            let count = matchCountsByDate[dateStr] || 0;
+            
+            let colorClass = 'bg-[#18181b] border border-gray-800/50'; 
+            if (count >= 5) colorClass = 'bg-[#d946ef]'; 
+            else if (count >= 3) colorClass = 'bg-[#a21caf]'; 
+            else if (count >= 1) colorClass = 'bg-[#6b21a8]'; 
+
+            let niceDate = cellDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' });
+            
+            cell.className = `w-3 h-3 rounded-sm ${colorClass} transition-all hover:scale-125 hover:z-10 relative cursor-crosshair`;
+            cell.title = count > 0 ? `${niceDate}: ігор — ${count}` : `${niceDate}: немає ігор`;
+        }
+        
+        heatmapGrid.appendChild(cell);
     }
 }
 

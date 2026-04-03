@@ -6,7 +6,6 @@
     <title>CS2 Analytics Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
-
     <script>
       tailwind.config = {
         theme: {
@@ -235,8 +234,10 @@
           <div class="h-28 w-full mb-3">
             <canvas id="trendChart"></canvas>
           </div>
-
-          <div id="matchResults" class="flex w-full"></div>
+          <div
+            id="matchResults"
+            class="flex justify-between w-full gap-1 overflow-x-auto scrollbar-hide"
+          ></div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -323,33 +324,6 @@
           </div>
         </div>
 
-        <div
-          id="mapStatsSection"
-          class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl hidden"
-        >
-          <h3
-            class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex justify-between items-center"
-          >
-            <span class="flex items-center gap-2">
-              <svg
-                class="w-4 h-4 text-gray-400"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"
-                />
-              </svg>
-              Ефективність по картах (Lifetime)
-            </span>
-            <span
-              class="bg-faceit/20 text-faceit px-2 py-0.5 rounded text-[10px] tracking-widest border border-faceit/30"
-              >5V5</span
-            >
-          </h3>
-          <div id="mapStatsContainer" class="space-y-3"></div>
-        </div>
-
         <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
           <div class="flex gap-2 mb-6">
             <button
@@ -385,14 +359,12 @@
               ADR
             </button>
           </div>
-
           <div class="flex flex-col lg:flex-row gap-4">
             <div
               class="flex-grow h-64 lg:h-80 border border-gray-800 rounded-lg p-4 bg-[#18181b]"
             >
               <canvas id="performanceChart"></canvas>
             </div>
-
             <div
               class="w-full lg:w-48 bg-[#18181b] border border-gray-800 rounded-lg p-5 flex flex-col justify-between"
             >
@@ -420,6 +392,217 @@
                   ><span id="panelLowVal" class="text-white font-bold">-</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          id="mapStatsSection"
+          class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl hidden"
+        >
+          <h3
+            class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex justify-between items-center"
+          >
+            <span class="flex items-center gap-2">
+              <svg
+                class="w-4 h-4 text-gray-400"
+                fill="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"
+                />
+              </svg>
+              Ефективність по картах (Lifetime)
+            </span>
+            <span
+              class="bg-faceit/20 text-faceit px-2 py-0.5 rounded text-[10px] tracking-widest border border-faceit/30"
+              >5V5</span
+            >
+          </h3>
+          <div id="mapStatsContainer" class="space-y-3"></div>
+        </div>
+
+        <div id="playActivitySection" class="hidden mt-6">
+          <h2
+            class="text-2xl font-extrabold text-white mb-6 flex items-center gap-3"
+          >
+            Play activity
+          </h2>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div
+              class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between"
+            >
+              <div>
+                <div id="paMatches" class="text-4xl font-bold text-white mb-1">
+                  0
+                </div>
+                <div
+                  class="text-xs text-gray-500 font-bold uppercase tracking-wider"
+                >
+                  Matches played
+                </div>
+              </div>
+              <div
+                class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold"
+              >
+                <span class="text-gray-500">Days played</span>
+                <span id="paDays" class="text-white">0</span>
+              </div>
+            </div>
+            <div
+              class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between"
+            >
+              <div>
+                <div id="paMonth" class="text-2xl font-bold text-white mb-1">
+                  -
+                </div>
+                <div
+                  class="text-xs text-gray-500 font-bold uppercase tracking-wider"
+                >
+                  Most active month
+                </div>
+              </div>
+              <div
+                class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold"
+              >
+                <span class="text-gray-500">Matches played</span>
+                <span id="paMonthMatches" class="text-white">0</span>
+              </div>
+            </div>
+            <div
+              class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between"
+            >
+              <div>
+                <div id="paHour" class="text-2xl font-bold text-white mb-1">
+                  -
+                </div>
+                <div
+                  class="text-xs text-gray-500 font-bold uppercase tracking-wider"
+                >
+                  Most active hour
+                </div>
+              </div>
+              <div
+                class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold"
+              >
+                <span class="text-gray-500">Win rate</span>
+                <span id="paHourWinrate" class="text-green-400">0%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div
+              class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl"
+            >
+              <div class="flex justify-between items-start mb-6">
+                <div>
+                  <div
+                    class="text-xl font-bold text-white flex items-center gap-2"
+                  >
+                    <span id="paAvgDaily">0.0</span>
+                    <span class="text-xs text-green-500 font-bold">↑</span>
+                  </div>
+                  <div
+                    class="text-xs text-gray-500 font-bold uppercase tracking-wider"
+                  >
+                    Average daily matches
+                  </div>
+                </div>
+                <div class="flex gap-3 text-xs font-bold">
+                  <span class="flex items-center gap-1 text-gray-300"
+                    ><span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                    Matches</span
+                  >
+                  <span class="flex items-center gap-1 text-green-500"
+                    ><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                    Wins</span
+                  >
+                </div>
+              </div>
+              <div class="h-32"><canvas id="dailyActivityChart"></canvas></div>
+            </div>
+
+            <div
+              class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl"
+            >
+              <div class="flex justify-between items-start mb-6">
+                <div>
+                  <div
+                    class="text-xl font-bold text-white flex items-center gap-2"
+                  >
+                    <span id="paAvgWeekly">0.0</span>
+                    <span class="text-xs text-green-500 font-bold">↑</span>
+                  </div>
+                  <div
+                    class="text-xs text-gray-500 font-bold uppercase tracking-wider"
+                  >
+                    Average weekly matches
+                  </div>
+                </div>
+                <div class="flex gap-3 text-xs font-bold">
+                  <span class="flex items-center gap-1 text-gray-300"
+                    ><span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                    Matches</span
+                  >
+                  <span class="flex items-center gap-1 text-green-500"
+                    ><span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                    Wins</span
+                  >
+                </div>
+              </div>
+              <div class="h-32"><canvas id="weeklyActivityChart"></canvas></div>
+            </div>
+          </div>
+
+          <div
+            class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-hidden"
+          >
+            <h3 class="text-base font-bold text-white mb-6">Activity</h3>
+            <div class="overflow-x-auto scrollbar-hide pb-4">
+              <div class="flex gap-2" style="min-width: 800px">
+                <div
+                  class="grid grid-rows-7 gap-1 text-[10px] text-gray-500 font-bold items-center mt-1"
+                >
+                  <div class="h-3 flex items-center">M</div>
+                  <div class="h-3 flex items-center">T</div>
+                  <div class="h-3 flex items-center">W</div>
+                  <div class="h-3 flex items-center">T</div>
+                  <div class="h-3 flex items-center">F</div>
+                  <div class="h-3 flex items-center">S</div>
+                  <div class="h-3 flex items-center">S</div>
+                </div>
+
+                <div
+                  id="heatmapGrid"
+                  class="grid grid-rows-7 grid-flow-col gap-1 flex-1 mt-1"
+                ></div>
+              </div>
+            </div>
+
+            <div
+              class="flex gap-4 items-center mt-4 text-xs font-bold text-gray-500"
+            >
+              <span>Games Played</span>
+              <span class="flex items-center gap-1"
+                ><span class="w-3 h-3 rounded-sm bg-[#d946ef]"></span>
+                High</span
+              >
+              <span class="flex items-center gap-1"
+                ><span class="w-3 h-3 rounded-sm bg-[#a21caf]"></span>
+                Medium</span
+              >
+              <span class="flex items-center gap-1"
+                ><span class="w-3 h-3 rounded-sm bg-[#6b21a8]"></span> Low</span
+              >
+              <span class="flex items-center gap-1"
+                ><span
+                  class="w-3 h-3 rounded-sm bg-[#18181b] border border-gray-800"
+                ></span>
+                No Games</span
+              >
             </div>
           </div>
         </div>

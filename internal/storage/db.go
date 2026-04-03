@@ -84,7 +84,40 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		rKR = profile.Recent.AvgKRRatio
 		rEntry = profile.Recent.TotalEntryKills
 		rSniper = profile.Recent.TotalSniperKills
-		historyJSON, _ = json.Marshal(profile.Recent.MatchHistory)
+
+		var oldHistoryText string
+		_ = s.db.QueryRow("SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
+
+		var combinedHistory []faceit.PlayerMatchStats
+		existingMatches := make(map[string]bool)
+
+		if oldHistoryText != "" {
+			json.Unmarshal([]byte(oldHistoryText), &combinedHistory)
+			for _, m := range combinedHistory {
+				if m.MatchId != "" {
+					existingMatches[m.MatchId] = true
+				}
+			}
+		}
+
+		var newMatches []faceit.PlayerMatchStats
+		for _, m := range profile.Recent.MatchHistory {
+			if m.MatchId != "" && !existingMatches[m.MatchId] {
+				newMatches = append(newMatches, m)
+				existingMatches[m.MatchId] = true
+			} else if m.MatchId == "" {
+				newMatches = append(newMatches, m)
+			}
+		}
+
+		finalHistory := append(newMatches, combinedHistory...)
+
+		if len(finalHistory) > 1000 {
+			finalHistory = finalHistory[:1000]
+		}
+
+		profile.Recent.MatchHistory = finalHistory
+		historyJSON, _ = json.Marshal(finalHistory)
 	}
 
 	query := `
@@ -99,7 +132,7 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
 		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
 		recent_total_entry = excluded.recent_total_entry, recent_total_sniper = excluded.recent_total_sniper,
-		recent_history = excluded.recent_history,
+		recent_history = excluded.recent_history, 
 		last_updated = CURRENT_TIMESTAMP;`
 
 	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches, string(mapStatsJSON),
