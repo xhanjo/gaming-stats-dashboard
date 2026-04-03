@@ -24,8 +24,16 @@ type GameInfo struct {
 	FaceitElo  int `json:"faceit_elo"`
 }
 
+type Segment struct {
+	Type  string            `json:"type"`
+	Mode  string            `json:"mode"`
+	Label string            `json:"label"`
+	Stats map[string]string `json:"stats"`
+}
+
 type CS2Stats struct {
 	Lifetime LifetimeStats `json:"lifetime"`
+	Segments []Segment     `json:"segments"`
 }
 
 type LifetimeStats struct {

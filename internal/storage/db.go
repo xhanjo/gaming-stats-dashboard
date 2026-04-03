@@ -37,6 +37,7 @@ func (s *Storage) InitTable() error {
 		cs2_kd TEXT,
 		cs2_winrate TEXT,
 		cs2_matches TEXT,
+		map_stats TEXT,
 		recent_matches_analyzed INTEGER,
 		recent_avg_kills REAL,
 		recent_avg_adr REAL,
@@ -62,10 +63,13 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 	}
 
 	kd, winrate, matches := "", "", ""
+	var mapStatsJSON []byte
+
 	if profile.Stats != nil {
 		kd = profile.Stats.Lifetime.AverageKD
 		winrate = profile.Stats.Lifetime.WinRate
 		matches = profile.Stats.Lifetime.Matches
+		mapStatsJSON, _ = json.Marshal(profile.Stats.Segments)
 	}
 
 	var rMatches, rEntry, rSniper int
@@ -85,27 +89,27 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 
 	query := `
 	INSERT INTO players (
-		player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+		player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches, map_stats,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
-	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	ON CONFLICT(player_id) DO UPDATE SET
 		nickname = excluded.nickname, avatar = excluded.avatar, country = excluded.country, steam_id = excluded.steam_id,
 		cs2_level = excluded.cs2_level, cs2_elo = excluded.cs2_elo,
-		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches,
+		cs2_kd = excluded.cs2_kd, cs2_winrate = excluded.cs2_winrate, cs2_matches = excluded.cs2_matches, map_stats = excluded.map_stats,
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
 		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
 		recent_total_entry = excluded.recent_total_entry, recent_total_sniper = excluded.recent_total_sniper,
 		recent_history = excluded.recent_history,
 		last_updated = CURRENT_TIMESTAMP;`
 
-	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches,
+	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches, string(mapStatsJSON),
 		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper, string(historyJSON))
 	return err
 }
 
 func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	query := `
-	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches,
+	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches, map_stats,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
 	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
@@ -113,19 +117,27 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 
 	var p faceit.PlayerProfile
 	var cs2Level, cs2Elo int
-	var kd, winrate, matches string
+	var kd, winrate, matches, mapStatsText string
 	var rMatches, rEntry, rSniper int
 	var rKills, rADR, rHS, rKR float64
 	var historyText string
 
-	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.Country, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches,
+	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.Country, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches, &mapStatsText,
 		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText)
 	if err != nil {
 		return nil, err
 	}
 
 	p.Games = map[string]faceit.GameInfo{"cs2": {SkillLevel: cs2Level, FaceitElo: cs2Elo}}
-	p.Stats = &faceit.CS2Stats{Lifetime: faceit.LifetimeStats{AverageKD: kd, WinRate: winrate, Matches: matches}}
+
+	var segments []faceit.Segment
+	if mapStatsText != "" {
+		json.Unmarshal([]byte(mapStatsText), &segments)
+	}
+	p.Stats = &faceit.CS2Stats{
+		Lifetime: faceit.LifetimeStats{AverageKD: kd, WinRate: winrate, Matches: matches},
+		Segments: segments,
+	}
 
 	if rMatches > 0 {
 		var matchHistory []faceit.PlayerMatchStats

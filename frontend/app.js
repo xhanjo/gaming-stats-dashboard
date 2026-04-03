@@ -43,6 +43,11 @@ function resetUI() {
     document.getElementById('playerLevelIcon').src = "";
     document.getElementById('matchResults').innerHTML = "";
     
+    const mapContainer = document.getElementById('mapStatsContainer');
+    if (mapContainer) mapContainer.innerHTML = "";
+    const mapSection = document.getElementById('mapStatsSection');
+    if (mapSection) mapSection.classList.add('hidden');
+    
     document.getElementById('playerAvatarFallback').classList.remove('hidden');
     document.getElementById('playerLevelIcon').classList.add('hidden');
 
@@ -126,6 +131,74 @@ async function searchPlayer(event) {
             document.getElementById('playerLifetimeKD').textContent = data.stats.lifetime["Average K/D Ratio"];
         }
 
+        const mapContainer = document.getElementById('mapStatsContainer');
+        const mapSection = document.getElementById('mapStatsSection');
+        
+        if (mapContainer && mapSection) {
+            if (data.stats && data.stats.segments) {
+                const mapSegments = data.stats.segments.filter(s => s.type === "Map" && s.mode === "5v5");
+                
+                if (mapSegments.length > 0) {
+                    mapSegments.sort((a, b) => parseInt(b.stats["Matches"] || 0) - parseInt(a.stats["Matches"] || 0));
+
+mapContainer.innerHTML = mapSegments.map(mapData => {
+                        const mapName = mapData.label.replace('de_', '');
+                        const matches = parseInt(mapData.stats["Matches"] || 0);
+                        const wins = parseInt(mapData.stats["Wins"] || 0);
+                        const winRate = parseInt(mapData.stats["Win Rate %"] || 0);
+                        const mapKD = parseFloat(mapData.stats["Average K/D Ratio"] || 0).toFixed(2);
+                        
+                        const wrColor = winRate >= 50 ? 'bg-green-500' : 'bg-red-500';
+                        const barWidth = Math.max(winRate, 5); 
+
+                        const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+
+                        return `
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between bg-gray-800/30 p-4 rounded-xl border border-gray-700/50 gap-4 transition-colors hover:bg-gray-800/50">
+                            <div class="w-full md:w-1/4 font-bold text-white text-lg capitalize tracking-wide flex items-center gap-3">
+                                
+                                <img src="assets/maps/${safeMapName}.png" 
+                                     onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" 
+                                     class="w-8 h-8 object-contain drop-shadow-md">
+                                     
+                                <div class="hidden w-8 h-8 rounded-md bg-gray-700 flex items-center justify-center text-xs text-gray-400 font-mono shadow-inner">
+                                    ${mapName.substring(0, 2)}
+                                </div>
+                                
+                                ${mapName}
+                            </div>
+                            
+                            <div class="w-full md:w-2/4">
+                                <div class="flex justify-between text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
+                                    <span>Win Rate (${winRate}%)</span>
+                                    <span>${wins}W - ${matches - wins}L</span>
+                                </div>
+                                <div class="w-full bg-gray-700/50 h-2.5 rounded-full overflow-hidden shadow-inner">
+                                    <div class="h-full ${wrColor} transition-all duration-1000 rounded-full" style="width: ${barWidth}%"></div>
+                                </div>
+                            </div>
+
+                            <div class="w-full md:w-1/4 flex justify-between md:justify-end gap-8 text-sm">
+                                <div class="text-center">
+                                    <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Матчів</span>
+                                    <strong class="text-white text-base">${matches}</strong>
+                                </div>
+                                <div class="text-center">
+                                    <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">K/D</span>
+                                    <strong class="text-faceit text-base">${mapKD}</strong>
+                                </div>
+                            </div>
+                        </div>`;
+                    }).join('');
+                    mapSection.classList.remove('hidden');
+                } else {
+                    mapSection.classList.add('hidden');
+                }
+            } else {
+                mapSection.classList.add('hidden');
+            }
+        }
+
         if (data.recent_form && data.recent_form.match_history) {
             let totalKills = 0, totalDeaths = 0;
             let trendData = []; 
@@ -145,7 +218,6 @@ async function searchPlayer(event) {
                 const color = isWin ? "bg-green-500" : "bg-red-500";
                 const label = isWin ? "W" : "L";
 
-                // ВИПРАВЛЕНО: огортаємо в flex-1 flex justify-center для ідеального центрування під графіком
                 return `<div class="flex-1 flex justify-center"><div class="w-5 h-5 sm:w-6 sm:h-6 ${color} rounded text-[10px] flex items-center justify-center text-white font-bold shadow-sm" title="Kills: ${kills}">${label}</div></div>`;
             }).join('');
             
@@ -206,7 +278,6 @@ function drawTrendChart(dataPoints) {
                 tooltip: { callbacks: { label: function(context) { return ' K/D: ' + context.parsed.y; } } }
             },
             scales: {
-                // СЕКРЕТ ІДЕАЛЬНОГО ВІДЦЕНТРУВАННЯ: offset: true
                 x: { display: false, offset: true }, 
                 y: { display: false, min: Math.min(...dataPoints) * 0.8 } 
             },
