@@ -24,6 +24,10 @@ func New(dbPath string) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
+func (s *Storage) Close() error {
+	return s.db.Close()
+}
+
 func (s *Storage) InitTable() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS players (
