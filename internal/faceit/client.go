@@ -46,7 +46,6 @@ type MatchHistoryResponse struct {
 	Items []MatchHistoryItem `json:"items"`
 }
 
-// 🔥 ДОДАНО ПОЛЕ StartedAt 🔥
 type MatchHistoryItem struct {
 	MatchID   string `json:"match_id"`
 	StartedAt int64  `json:"started_at"`
@@ -57,7 +56,8 @@ type MatchStatsResponse struct {
 }
 
 type MatchRound struct {
-	Teams []MatchTeam `json:"teams"`
+	Teams      []MatchTeam       `json:"teams"`
+	RoundStats map[string]string `json:"round_stats"`
 }
 
 type MatchTeam struct {
@@ -91,6 +91,8 @@ type PlayerMatchStats struct {
 	UpdatedAt1  interface{} `json:"updated_at"`
 	CreatedAt2  interface{} `json:"Created At"`
 	UpdatedAt2  interface{} `json:"Updated At"`
+	Map         string      `json:"map"`
+	Score       string      `json:"score"`
 }
 
 type RecentForm struct {
@@ -224,6 +226,9 @@ func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatc
 	for _, team := range matchResp.Rounds[0].Teams {
 		for _, player := range team.Players {
 			if player.PlayerID == targetPlayerID {
+				player.PlayerStats.Map = matchResp.Rounds[0].RoundStats["Map"]
+				player.PlayerStats.Score = matchResp.Rounds[0].RoundStats["Score"]
+
 				return &player.PlayerStats, nil
 			}
 		}
@@ -253,7 +258,6 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 			continue
 		}
 
-		// 🔥 МАГІЯ: "Перекидаємо" дату з історії матчів в детальну статистику 🔥
 		stats.MatchId = item.MatchID
 		stats.CreatedAt1 = item.StartedAt
 

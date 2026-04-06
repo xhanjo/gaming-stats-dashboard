@@ -1,9 +1,32 @@
 let myChart = null;
 let trendChart = null; 
-let dailyChart = null; // Новий графік
-let weeklyChart = null; // Новий графік
+let dailyChart = null; 
+let weeklyChart = null; 
 let currentMatchHistory = []; 
 let trueKDVal = "0.00"; 
+
+function switchTab(tabId) {
+    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity'];
+    
+    tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-faceit', 'border-faceit');
+        btn.classList.add('text-gray-400', 'border-transparent');
+    });
+
+    const activeTab = document.getElementById(tabId);
+    if (activeTab) activeTab.classList.remove('hidden');
+
+    const activeBtn = document.getElementById('btn-' + tabId);
+    if (activeBtn) {
+        activeBtn.classList.add('text-faceit', 'border-faceit');
+        activeBtn.classList.remove('text-gray-400', 'border-transparent');
+    }
+}
 
 function getSearchHistory() { return JSON.parse(localStorage.getItem('searchHistory') || '[]'); }
 
@@ -47,12 +70,13 @@ function resetUI() {
     
     const mapContainer = document.getElementById('mapStatsContainer');
     if (mapContainer) mapContainer.innerHTML = "";
-    const mapSection = document.getElementById('mapStatsSection');
-    if (mapSection) mapSection.classList.add('hidden');
     
-    const playActivity = document.getElementById('playActivitySection');
-    if (playActivity) playActivity.classList.add('hidden');
-    
+    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity'];
+    tabs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+    });
+
     document.getElementById('playerAvatarFallback').classList.remove('hidden');
     document.getElementById('playerLevelIcon').classList.add('hidden');
 
@@ -139,67 +163,53 @@ async function searchPlayer(event) {
         }
 
         const mapContainer = document.getElementById('mapStatsContainer');
-        const mapSection = document.getElementById('mapStatsSection');
-        
-        if (mapContainer && mapSection) {
-            if (data.stats && data.stats.segments) {
-                const mapSegments = data.stats.segments.filter(s => s.type === "Map" && s.mode === "5v5");
-                
-                if (mapSegments.length > 0) {
-                    mapSegments.sort((a, b) => parseInt(b.stats["Matches"] || 0) - parseInt(a.stats["Matches"] || 0));
+        if (mapContainer && data.stats && data.stats.segments) {
+            const mapSegments = data.stats.segments.filter(s => s.type === "Map" && s.mode === "5v5");
+            
+            if (mapSegments.length > 0) {
+                mapSegments.sort((a, b) => parseInt(b.stats["Matches"] || 0) - parseInt(a.stats["Matches"] || 0));
 
-                    mapContainer.innerHTML = mapSegments.map(mapData => {
-                        const mapName = mapData.label.replace('de_', '');
-                        const matches = parseInt(mapData.stats["Matches"] || 0);
-                        const wins = parseInt(mapData.stats["Wins"] || 0);
-                        const winRate = parseInt(mapData.stats["Win Rate %"] || 0);
-                        const mapKD = parseFloat(mapData.stats["Average K/D Ratio"] || 0).toFixed(2);
-                        
-                        const wrColor = winRate >= 50 ? 'bg-green-500' : 'bg-red-500';
-                        const barWidth = winRate; 
+                mapContainer.innerHTML = mapSegments.map(mapData => {
+                    const mapName = mapData.label.replace('de_', '');
+                    const matches = parseInt(mapData.stats["Matches"] || 0);
+                    const wins = parseInt(mapData.stats["Wins"] || 0);
+                    const winRate = parseInt(mapData.stats["Win Rate %"] || 0);
+                    const mapKD = parseFloat(mapData.stats["Average K/D Ratio"] || 0).toFixed(2);
+                    
+                    const wrColor = winRate >= 50 ? 'bg-green-500' : 'bg-red-500';
+                    const barWidth = winRate; 
 
-                        const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+                    const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
 
-                        return `
-                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between bg-gray-800/30 p-4 rounded-xl border border-gray-700/50 gap-4 transition-colors hover:bg-gray-800/50">
-                            <div class="w-full md:w-1/4 font-bold text-white text-lg capitalize tracking-wide flex items-center gap-3">
-                                
-                                <img src="assets/maps/${safeMapName}.png" 
-                                     onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" 
-                                     class="w-8 h-8 object-contain drop-shadow-md">
-                                     
-                                <div class="hidden w-8 h-8 rounded-md bg-gray-700 flex items-center justify-center text-xs text-gray-400 font-mono shadow-inner">
-                                    ${mapName.substring(0, 2)}
-                                </div>
-                                
-                                ${mapName}
+                    return `
+                    <div class="flex flex-col md:flex-row items-start md:items-center justify-between bg-gray-800/30 p-4 rounded-xl border border-gray-700/50 gap-4 transition-colors hover:bg-gray-800/50">
+                        <div class="w-full md:w-1/4 font-bold text-white text-lg capitalize tracking-wide flex items-center gap-3">
+                            <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-8 h-8 object-contain drop-shadow-md">
+                            <div class="hidden w-8 h-8 rounded-md bg-gray-700 flex items-center justify-center text-xs text-gray-400 font-mono shadow-inner">${mapName.substring(0, 2)}</div>
+                            ${mapName}
+                        </div>
+                        <div class="w-full md:w-2/4">
+                            <div class="flex justify-between text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
+                                <span>Win Rate (${winRate}%)</span>
+                                <span>${wins}W - ${matches - wins}L</span>
                             </div>
-                            
-                            <div class="w-full md:w-2/4">
-                                <div class="flex justify-between text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
-                                    <span>Win Rate (${winRate}%)</span>
-                                    <span>${wins}W - ${matches - wins}L</span>
-                                </div>
-                                <div class="w-full bg-gray-700/50 h-2.5 rounded-full overflow-hidden shadow-inner">
-                                    <div class="h-full ${wrColor} transition-all duration-1000 rounded-full" style="width: ${barWidth}%"></div>
-                                </div>
+                            <div class="w-full bg-gray-700/50 h-2.5 rounded-full overflow-hidden shadow-inner">
+                                <div class="h-full ${wrColor} transition-all duration-1000 rounded-full" style="width: ${barWidth}%"></div>
                             </div>
-
-                            <div class="w-full md:w-1/4 flex justify-between md:justify-end gap-8 text-sm">
-                                <div class="text-center">
-                                    <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Матчів</span>
-                                    <strong class="text-white text-base">${matches}</strong>
-                                </div>
-                                <div class="text-center">
-                                    <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">K/D</span>
-                                    <strong class="text-faceit text-base">${mapKD}</strong>
-                                </div>
+                        </div>
+                        <div class="w-full md:w-1/4 flex justify-between md:justify-end gap-8 text-sm">
+                            <div class="text-center">
+                                <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Матчів</span>
+                                <strong class="text-white text-base">${matches}</strong>
                             </div>
-                        </div>`;
-                    }).join('');
-                    mapSection.classList.remove('hidden');
-                } else { mapSection.classList.add('hidden'); }
-            } else { mapSection.classList.add('hidden'); }
+                            <div class="text-center">
+                                <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">K/D</span>
+                                <strong class="text-faceit text-base">${mapKD}</strong>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
         }
 
         if (data.recent_form && data.recent_form.match_history) {
@@ -240,9 +250,11 @@ async function searchPlayer(event) {
             changeChart('kd');
 
             renderPlayActivity(data.recent_form.match_history);
+            renderMatchTable(chronologicalHistory.slice().reverse()); 
         }
 
         document.getElementById('playerCard').classList.remove('hidden');
+        switchTab('tab-summary'); // Одразу відкриваємо першу вкладку
 
     } catch (error) {
         document.getElementById('errorMessage').textContent = error.message;
@@ -252,10 +264,71 @@ async function searchPlayer(event) {
     }
 }
 
-// 🔥 РЕАЛЬНА ГЕНЕРАЦІЯ PLAY ACTIVITY (З надійним парсингом дат) 🔥
-function renderPlayActivity(matches) {
-    document.getElementById('playActivitySection').classList.remove('hidden');
+function renderMatchTable(matches) {
+    const tbody = document.getElementById('matchHistoryTableBody');
+    tbody.innerHTML = '';
 
+    const recent20 = matches.slice(0, 20);
+
+    recent20.forEach(m => {
+        const mapNameRaw = m.map ? m.map.replace('de_', '') : 'Unknown';
+        const safeMapName = mapNameRaw.toLowerCase().replace(/\s+/g, '');
+        const mapDisplay = mapNameRaw.charAt(0).toUpperCase() + mapNameRaw.slice(1);
+
+        const res = m.Result || m.i10 || m.Win || m.win || "0";
+        const isWin = (res.toString() === "1" || res.toString() === "true");
+        const resColor = isWin ? 'text-green-500' : 'text-red-500';
+        const resText = isWin ? 'WIN' : 'LOSS';
+
+        const kills = parseInt(m.Kills) || 0;
+        const deaths = parseInt(m.Deaths) || 1;
+        const assists = parseInt(m.Assists) || 0;
+        const kd = (kills / deaths).toFixed(2);
+        const kdColor = kd >= 1 ? 'text-green-400' : 'text-red-400';
+
+        const score = m.score ? m.score.replace(' / ', ':') : '-:-';
+
+        const hsVal = m["Headshots %"] || m.HeadshotsPc || '-';
+        const hsText = hsVal !== '-' ? hsVal + '%' : '-';
+
+        let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.CreatedAt2 || m.UpdatedAt2 || m["Created At"] || m["Updated At"] || m.created_at || m.updated_at;
+        let dateStr = "-";
+        if (rawTime) {
+            let ts = rawTime;
+            if (typeof ts === 'number' && ts < 10000000000) ts *= 1000;
+            let d = new Date(typeof ts === 'string' && isNaN(ts) ? ts.replace(' UTC', 'Z') : parseInt(ts));
+            if (!isNaN(d.getTime())) {
+                dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('uk-UA', {hour: '2-digit', minute:'2-digit'});
+            }
+        }
+
+        const row = `
+        <tr class="hover:bg-gray-800/30 transition-colors group">
+            <td class="py-3 pr-4 pl-2 text-gray-400 text-xs font-bold whitespace-nowrap">${dateStr}</td>
+            <td class="py-3 pr-4">
+                <div class="flex items-center gap-3">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-8 h-8 object-contain drop-shadow-md transition-transform group-hover:scale-110">
+                    <div class="hidden w-8 h-8 rounded border border-gray-700 bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase shadow-inner">${mapDisplay.substring(0, 2)}</div>
+                    <span class="font-bold text-white capitalize">${mapDisplay}</span>
+                </div>
+            </td>
+            <td class="py-3 pr-4">
+                <div class="flex flex-col">
+                    <span class="font-bold ${resColor}">${resText}</span>
+                    <span class="text-[11px] text-gray-400 font-mono font-bold tracking-widest">${score}</span>
+                </div>
+            </td>
+            <td class="py-3 pr-4 font-mono text-sm text-gray-300 font-bold tracking-wide">${kills} <span class="text-gray-600">-</span> ${assists} <span class="text-gray-600">-</span> ${deaths}</td>
+            <td class="py-3 pr-4 font-mono font-bold ${kdColor}">${kd}</td>
+            <td class="py-3 pr-4 font-mono text-sm font-bold text-gray-300">${m.ADR || '-'}</td>
+            <td class="py-3 font-mono text-sm font-bold text-gray-300">${hsText}</td>
+        </tr>
+        `;
+        tbody.innerHTML += row;
+    });
+}
+
+function renderPlayActivity(matches) {
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
@@ -269,29 +342,25 @@ function renderPlayActivity(matches) {
     let uniqueDays = new Set();
 
     matches.forEach((m, index) => {
-        // 1. Шукаємо будь-яку зачіпку на час
         let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.CreatedAt2 || m.UpdatedAt2 || m["Created At"] || m["Updated At"] || m.created_at || m.updated_at;
         let d = null;
 
         if (rawTime) {
             if (typeof rawTime === 'number') {
                 let ts = rawTime;
-                if (ts < 10000000000) ts *= 1000; // Переводимо секунди в мілісекунди
+                if (ts < 10000000000) ts *= 1000; 
                 d = new Date(ts);
             } else if (typeof rawTime === 'string') {
-                if (!isNaN(rawTime)) { // Якщо це число у вигляді рядка "1712150000"
+                if (!isNaN(rawTime)) { 
                     let ts = parseInt(rawTime);
                     if (ts < 10000000000) ts *= 1000;
                     d = new Date(ts);
                 } else { 
-                    // Якщо це дата-рядок (Faceit іноді віддає час по UTC)
                     d = new Date(rawTime.replace(' UTC', 'Z')); 
                 }
             }
         }
 
-        // 2. ЗАХИСТ: Якщо дата так і не знайшлась — рятуємо матч!
-        // Щоб графік не був порожнім, тимчасово імітуємо дату для старих ігор з бази
         if (!d || isNaN(d.getTime())) {
             d = new Date();
             d.setDate(d.getDate() - (index % 5)); 
@@ -308,7 +377,7 @@ function renderPlayActivity(matches) {
         if(isWin) hoursData[hour].w++;
 
         let day = d.getDay();
-        let jsDay = day === 0 ? 6 : day - 1; // 0 - Понеділок, 6 - Неділя
+        let jsDay = day === 0 ? 6 : day - 1; 
         daysData[jsDay].m++;
         if(isWin) daysData[jsDay].w++;
 
@@ -321,13 +390,11 @@ function renderPlayActivity(matches) {
         }
     });
 
-    // Оновлення карток
     document.getElementById('paMatches').textContent = totalMatches;
     document.getElementById('paDays').textContent = uniqueDays.size; 
     document.getElementById('paMonth').textContent = now.toLocaleString('en-US', { month: 'long' });
     document.getElementById('paMonthMatches').textContent = currentMonthMatches;
 
-    // Найактивніша година
     let maxHour = 0, maxHourVal = -1;
     hoursData.forEach((data, i) => {
         if (data.m > maxHourVal) { maxHourVal = data.m; maxHour = i; }
@@ -340,14 +407,12 @@ function renderPlayActivity(matches) {
     document.getElementById('paHourWinrate').textContent = hourWinrate + "%";
     document.getElementById('paHourWinrate').className = hourWinrate >= 50 ? 'text-green-400' : 'text-red-400';
 
-    // Середні значення
     let daysDivider = uniqueDays.size > 0 ? uniqueDays.size : 1;
     let weeksDivider = Math.max(1, uniqueDays.size / 7);
     
     document.getElementById('paAvgDaily').textContent = (totalMatches / daysDivider).toFixed(1);
     document.getElementById('paAvgWeekly').textContent = (totalMatches / weeksDivider).toFixed(1);
 
-    // Малюємо графіки
     if (dailyChart) dailyChart.destroy();
     dailyChart = new Chart(document.getElementById('dailyActivityChart').getContext('2d'), {
         type: 'bar',
@@ -374,16 +439,13 @@ function renderPlayActivity(matches) {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#71717a' } }, y: { display: false, beginAtZero: true } } }
     });
 
-// 🔥 HEATMAP КАЛЕНДАР ПО МІСЯЦЯХ (Останні 6 місяців, заповнені до кінця) 🔥
     const heatmapGrid = document.getElementById('heatmapGrid');
     heatmapGrid.innerHTML = '';
-    // Додаємо класи для рівномірного розтягування місяців по всій ширині
     heatmapGrid.className = 'flex flex-1 justify-between gap-4 w-full'; 
     
     let currentYear = now.getFullYear();
     let currentMonth = now.getMonth();
 
-    // Беремо останні 6 місяців (від 5 до 0)
     for (let i = 5; i >= 0; i--) {
         let monthDate = new Date(currentYear, currentMonth - i, 1);
         let year = monthDate.getFullYear();
@@ -394,7 +456,7 @@ function renderPlayActivity(matches) {
 
         let daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
         let firstDayOfWeek = monthDate.getDay();
-        let startPad = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Пн=0, Нд=6
+        let startPad = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; 
 
         let monthHtml = `
         <div class="flex flex-col flex-1">
@@ -402,16 +464,13 @@ function renderPlayActivity(matches) {
             <div class="grid grid-rows-7 grid-flow-col gap-1 md:gap-1.5">
         `;
 
-        // Відступ для початку місяця
         for (let p = 0; p < startPad; p++) {
             monthHtml += `<div class="w-3 h-3 md:w-3.5 md:h-3.5"></div>`;
         }
 
-        // Дні місяця
         for (let d = 1; d <= daysInMonth; d++) {
             let cellDate = new Date(year, monthIndex, d);
 
-            // Якщо дата в майбутньому — малюємо напівпрозорий порожній квадратик без підказок
             if (cellDate > now) {
                 monthHtml += `<div class="w-3 h-3 md:w-3.5 md:h-3.5 rounded-sm bg-[#18181b] border border-gray-800/50 opacity-40 pointer-events-none"></div>`;
                 continue; 
