@@ -230,6 +230,8 @@ func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatc
 				player.PlayerStats.Map = matchResp.Rounds[0].RoundStats["Map"]
 				player.PlayerStats.Score = matchResp.Rounds[0].RoundStats["Score"]
 
+				player.PlayerStats.MatchId = matchID
+
 				return &player.PlayerStats, nil
 			}
 		}

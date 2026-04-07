@@ -391,10 +391,12 @@ function renderPlayActivity(matches) {
             currentMonthMatches++;
         }
     });
+    
+    let currentMonthUk = now.toLocaleString('uk-UA', { month: 'long' });
 
     document.getElementById('paMatches').textContent = totalMatches;
     document.getElementById('paDays').textContent = uniqueDays.size; 
-    document.getElementById('paMonth').textContent = now.toLocaleString('en-US', { month: 'long' });
+    document.getElementById('paMonth').textContent = currentMonthUk.charAt(0).toUpperCase() + currentMonthUk.slice(1);
     document.getElementById('paMonthMatches').textContent = currentMonthMatches;
 
     let maxHour = 0, maxHourVal = -1;
@@ -432,7 +434,7 @@ function renderPlayActivity(matches) {
     weeklyChart = new Chart(document.getElementById('weeklyActivityChart').getContext('2d'), {
         type: 'bar',
         data: {
-            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            labels: ['Пн', 'Вв', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд'],
             datasets: [
                 { label: 'Matches', data: daysData.map(d => d.m), backgroundColor: '#ffffff', barPercentage: 0.5, borderRadius: 2 },
                 { label: 'Wins', data: daysData.map(d => d.w), backgroundColor: '#22c55e', barPercentage: 0.5, borderRadius: 2 }
@@ -453,7 +455,8 @@ function renderPlayActivity(matches) {
         let year = monthDate.getFullYear();
         let monthIndex = monthDate.getMonth();
 
-        let monthName = monthDate.toLocaleString('en-US', { month: 'long' });
+        let rawMonthName = monthDate.toLocaleString('uk-UA', { month: 'long' });
+        let monthName = rawMonthName.charAt(0).toUpperCase() + rawMonthName.slice(1);
         let headerText = (monthIndex === 0) ? `<span class="text-white">${year}</span> ${monthName}` : monthName;
 
         let daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
