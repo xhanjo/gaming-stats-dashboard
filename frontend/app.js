@@ -254,7 +254,7 @@ async function searchPlayer(event) {
         }
 
         document.getElementById('playerCard').classList.remove('hidden');
-        switchTab('tab-summary'); // Одразу відкриваємо першу вкладку
+        switchTab('tab-summary'); 
 
     } catch (error) {
         document.getElementById('errorMessage').textContent = error.message;
@@ -318,7 +318,9 @@ function renderMatchTable(matches) {
                     <span class="text-[11px] text-gray-400 font-mono font-bold tracking-widest">${score}</span>
                 </div>
             </td>
-            <td class="py-3 pr-4 font-mono text-sm text-gray-300 font-bold tracking-wide">${kills} <span class="text-gray-600">-</span> ${assists} <span class="text-gray-600">-</span> ${deaths}</td>
+            <td class="py-3 pr-4 font-mono text-sm text-gray-300 font-bold tracking-wide">
+                ${kills} <span class="text-gray-600">/</span> ${deaths} <span class="text-gray-600">/</span> ${assists}
+            </td>
             <td class="py-3 pr-4 font-mono font-bold ${kdColor}">${kd}</td>
             <td class="py-3 pr-4 font-mono text-sm font-bold text-gray-300">${m.ADR || '-'}</td>
             <td class="py-3 font-mono text-sm font-bold text-gray-300">${hsText}</td>

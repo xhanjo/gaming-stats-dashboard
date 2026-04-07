@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -247,20 +248,64 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 		return nil, fmt.Errorf("у гравця немає зіграних матчів")
 	}
 
+	type matchJob struct {
+		index int
+		item  MatchHistoryItem
+	}
+	type matchResult struct {
+		index int
+		stats *PlayerMatchStats
+		err   error
+	}
+
+	jobs := make(chan matchJob, len(matchItems))
+	results := make(chan matchResult, len(matchItems))
+
+	var wg sync.WaitGroup
+	const numWorkers = 4
+
+	for w := 1; w <= numWorkers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for job := range jobs {
+				stats, err := GetMatchStatsForPlayer(job.item.MatchID, playerID, apiKey)
+
+				if err == nil && stats != nil {
+					stats.CreatedAt1 = job.item.StartedAt
+				}
+
+				results <- matchResult{index: job.index, stats: stats, err: err}
+			}
+		}()
+	}
+
+	for i, item := range matchItems {
+		jobs <- matchJob{index: i, item: item}
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	orderedHistory := make([]*PlayerMatchStats, len(matchItems))
+	for res := range results {
+		if res.err == nil && res.stats != nil {
+			orderedHistory[res.index] = res.stats
+		}
+	}
+
 	var totalKills, totalADR, totalHS, totalKR float64
 	var totalEntry, totalSniper int
 	var successfulMatches int
 	var formHistory []PlayerMatchStats
 
-	for _, item := range matchItems {
-		stats, err := GetMatchStatsForPlayer(item.MatchID, playerID, apiKey)
-		if err != nil {
+	for _, stats := range orderedHistory {
+		if stats == nil {
 			continue
 		}
-
-		stats.MatchId = item.MatchID
-		stats.CreatedAt1 = item.StartedAt
-
 		formHistory = append(formHistory, *stats)
 
 		if val, err := strconv.ParseFloat(stats.Kills, 64); err == nil {
