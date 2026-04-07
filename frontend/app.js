@@ -183,13 +183,13 @@ async function searchPlayer(event) {
 
                     return `
                     <div class="flex flex-col md:flex-row items-start md:items-center justify-between bg-gray-800/30 p-4 rounded-xl border border-gray-700/50 gap-4 transition-colors hover:bg-gray-800/50">
-                        <div class="w-full md:w-1/4 font-bold text-white text-lg capitalize tracking-wide flex items-center gap-3">
-                            <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-8 h-8 object-contain drop-shadow-md">
-                            <div class="hidden w-8 h-8 rounded-md bg-gray-700 flex items-center justify-center text-xs text-gray-400 font-mono shadow-inner">${mapName.substring(0, 2)}</div>
-                            ${mapName}
+                        <div class="w-full md:w-1/4 font-bold text-white text-base md:text-lg capitalize tracking-wide flex items-center gap-2 md:gap-3">
+                            <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-md">
+                            <div class="hidden w-6 h-6 md:w-8 md:h-8 rounded-md bg-gray-700 flex items-center justify-center text-[10px] text-gray-400 font-mono shadow-inner">${mapName.substring(0, 2)}</div>
+                            <span class="truncate max-w-[100px] md:max-w-none">${mapName}</span>
                         </div>
                         <div class="w-full md:w-2/4">
-                            <div class="flex justify-between text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
+                            <div class="flex justify-between text-[10px] md:text-xs text-gray-400 mb-1.5 font-bold uppercase tracking-wider">
                                 <span>Win Rate (${winRate}%)</span>
                                 <span>${wins}W - ${matches - wins}L</span>
                             </div>
@@ -197,7 +197,7 @@ async function searchPlayer(event) {
                                 <div class="h-full ${wrColor} transition-all duration-1000 rounded-full" style="width: ${barWidth}%"></div>
                             </div>
                         </div>
-                        <div class="w-full md:w-1/4 flex justify-between md:justify-end gap-8 text-sm">
+                        <div class="w-full md:w-1/4 flex justify-between md:justify-end gap-6 md:gap-8 text-sm">
                             <div class="text-center">
                                 <span class="block text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-0.5">Матчів</span>
                                 <strong class="text-white text-base">${matches}</strong>
@@ -232,7 +232,7 @@ async function searchPlayer(event) {
                 const color = isWin ? "bg-green-500" : "bg-red-500";
                 const label = isWin ? "W" : "L";
 
-                return `<div class="flex-1 flex justify-center"><div class="w-5 h-5 sm:w-6 sm:h-6 ${color} rounded text-[10px] flex items-center justify-center text-white font-bold shadow-sm" title="Kills: ${kills}">${label}</div></div>`;
+                return `<div class="flex-1 flex justify-center"><div class="w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6 ${color} rounded text-[8px] sm:text-[10px] flex items-center justify-center text-white font-bold shadow-sm" title="Kills: ${kills}">${label}</div></div>`;      
             }).join('');
             
             document.getElementById('matchResults').innerHTML = historyHtml;
@@ -303,27 +303,27 @@ function renderMatchTable(matches) {
         }
 
         const row = `
-        <tr class="hover:bg-gray-800/30 transition-colors group">
-            <td class="py-3 pr-4 pl-2 text-gray-400 text-xs font-bold whitespace-nowrap">${dateStr}</td>
+        <tr class="hover:bg-gray-800/30 transition-colors group text-[11px] md:text-sm">
+            <td class="py-3 pr-4 pl-2 text-gray-400 font-bold whitespace-nowrap">${dateStr}</td>
             <td class="py-3 pr-4">
-                <div class="flex items-center gap-3">
-                    <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-8 h-8 object-contain drop-shadow-md transition-transform group-hover:scale-110">
-                    <div class="hidden w-8 h-8 rounded border border-gray-700 bg-gray-800 flex items-center justify-center text-[10px] text-gray-400 font-bold uppercase shadow-inner">${mapDisplay.substring(0, 2)}</div>
+                <div class="flex items-center gap-2 md:gap-3">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" class="w-6 h-6 md:w-8 md:h-8 object-contain drop-shadow-md transition-transform group-hover:scale-110">
+                    <div class="hidden w-6 h-6 md:w-8 md:h-8 rounded border border-gray-700 bg-gray-800 flex items-center justify-center text-[9px] md:text-[10px] text-gray-400 font-bold uppercase shadow-inner">${mapDisplay.substring(0, 2)}</div>
                     <span class="font-bold text-white capitalize">${mapDisplay}</span>
                 </div>
             </td>
             <td class="py-3 pr-4">
                 <div class="flex flex-col">
                     <span class="font-bold ${resColor}">${resText}</span>
-                    <span class="text-[11px] text-gray-400 font-mono font-bold tracking-widest">${score}</span>
+                    <span class="text-[10px] md:text-[11px] text-gray-400 font-mono font-bold tracking-widest">${score}</span>
                 </div>
             </td>
-            <td class="py-3 pr-4 font-mono text-sm text-gray-300 font-bold tracking-wide">
+            <td class="py-3 pr-4 font-mono text-gray-300 font-bold tracking-wide">
                 ${kills} <span class="text-gray-600">/</span> ${deaths} <span class="text-gray-600">/</span> ${assists}
             </td>
             <td class="py-3 pr-4 font-mono font-bold ${kdColor}">${kd}</td>
-            <td class="py-3 pr-4 font-mono text-sm font-bold text-gray-300">${m.ADR || '-'}</td>
-            <td class="py-3 font-mono text-sm font-bold text-gray-300">${hsText}</td>
+            <td class="py-3 pr-4 font-mono font-bold text-gray-300">${m.ADR || '-'}</td>
+            <td class="py-3 font-mono font-bold text-gray-300">${hsText}</td>
         </tr>
         `;
         tbody.innerHTML += row;
