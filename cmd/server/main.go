@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 
@@ -36,9 +40,40 @@ func main() {
 	http.HandleFunc("/api/player", handlers.GetPlayerStats(db, apiKey))
 
 	port := ":8080"
-	fmt.Printf("API Сервер успішно запущено! Порт %s\n", port)
 
-	if err := http.ListenAndServe(port, nil); err != nil {
-		log.Fatal("Критична помилка сервера: ", err)
+	srv := &http.Server{
+		Addr:    port,
+		Handler: http.DefaultServeMux,
 	}
+
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		fmt.Printf("API Сервер успішно запущено! Порт %s\n", port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Критична помилка сервера: %v", err)
+		}
+	}()
+
+	<-stopChan
+	log.Println("\nОтримано сигнал зупинки (Ctrl+C). Починаємо Graceful Shutdown...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Помилка під час зупинки HTTP-сервера: %v", err)
+	} else {
+		log.Println("HTTP-сервер успішно зупинено (нові запити відхилено).")
+	}
+
+	log.Println("Зберігаємо кеш та закриваємо з'єднання з базою даних SQLite...")
+	if err := db.Close(); err != nil {
+		log.Printf("ERROR: Помилка закриття БД: %v", err)
+	} else {
+		log.Println("Базу даних закрито успішно. Ваші дані в безпеці!")
+	}
+
+	log.Println("Програму успішно завершено.")
 }
