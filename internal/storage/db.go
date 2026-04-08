@@ -90,7 +90,11 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		rSniper = profile.Recent.TotalSniperKills
 
 		var oldHistoryText string
-		_ = s.db.QueryRow("SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
+		err := s.db.QueryRow("SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
+
+		if err != nil && err != sql.ErrNoRows {
+			return fmt.Errorf("помилка читання історії з БД під час оновлення: %v", err)
+		}
 
 		var combinedHistory []faceit.PlayerMatchStats
 		existingMatches := make(map[string]bool)

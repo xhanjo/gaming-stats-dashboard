@@ -16,6 +16,8 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 
+		ctx := r.Context()
+
 		nickname := r.URL.Query().Get("nickname")
 		if nickname == "" {
 			w.WriteHeader(http.StatusBadRequest)
@@ -36,21 +38,21 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 
 		log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
 
-		profile, err = faceit.GetPlayerProfile(nickname, apiKey)
+		profile, err = faceit.GetPlayerProfile(ctx, nickname, apiKey)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, `{"error": "Гравця не знайдено або помилка API"}`)
 			return
 		}
 
-		stats, err := faceit.GetCS2Stats(profile.PlayerID, apiKey)
+		stats, err := faceit.GetCS2Stats(ctx, profile.PlayerID, apiKey)
 		if err == nil {
 			profile.Stats = stats
 		} else {
 			log.Printf("WARN: Не вдалося отримати загальну статистику: %v", err)
 		}
 
-		recentForm, err := faceit.CalculateRecentForm(profile.PlayerID, apiKey, 20)
+		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, 20)
 		if err == nil {
 			profile.Recent = recentForm
 			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)

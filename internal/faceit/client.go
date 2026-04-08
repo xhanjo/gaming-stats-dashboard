@@ -1,6 +1,7 @@
 package faceit
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -107,18 +108,21 @@ type RecentForm struct {
 	MatchHistory     []PlayerMatchStats `json:"match_history"`
 }
 
-func GetPlayerProfile(nickname, apiKey string) (*PlayerProfile, error) {
+var httpClient = &http.Client{
+	Timeout: 10 * time.Second,
+}
+
+func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProfile, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players?nickname=%s", nickname)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -136,18 +140,17 @@ func GetPlayerProfile(nickname, apiKey string) (*PlayerProfile, error) {
 	return &profile, nil
 }
 
-func GetCS2Stats(playerID, apiKey string) (*CS2Stats, error) {
+func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/stats/cs2", playerID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -165,19 +168,17 @@ func GetCS2Stats(playerID, apiKey string) (*CS2Stats, error) {
 	return &stats, nil
 }
 
-// 🔥 ТЕПЕР ПОВЕРТАЄМО ОБ'ЄКТИ MatchHistoryItem ЗАМІСТЬ РЯДКІВ 🔥
-func GetPlayerMatchHistory(playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
+func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=0&limit=%d", playerID, limit)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -195,17 +196,16 @@ func GetPlayerMatchHistory(playerID, apiKey string, limit int) ([]MatchHistoryIt
 	return historyResponse.Items, nil
 }
 
-func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
+func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/matches/%s/stats", matchID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -229,7 +229,6 @@ func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatc
 			if player.PlayerID == targetPlayerID {
 				player.PlayerStats.Map = matchResp.Rounds[0].RoundStats["Map"]
 				player.PlayerStats.Score = matchResp.Rounds[0].RoundStats["Score"]
-
 				player.PlayerStats.MatchId = matchID
 
 				return &player.PlayerStats, nil
@@ -240,8 +239,8 @@ func GetMatchStatsForPlayer(matchID, targetPlayerID, apiKey string) (*PlayerMatc
 	return nil, fmt.Errorf("гравця %s не знайдено в матчі %s", targetPlayerID, matchID)
 }
 
-func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error) {
-	matchItems, err := GetPlayerMatchHistory(playerID, apiKey, limit)
+func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int) (*RecentForm, error) {
+	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -271,7 +270,8 @@ func CalculateRecentForm(playerID, apiKey string, limit int) (*RecentForm, error
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				stats, err := GetMatchStatsForPlayer(job.item.MatchID, playerID, apiKey)
+				// 🔥 Передаємо ctx у воркери
+				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)
 
 				if err == nil && stats != nil {
 					stats.CreatedAt1 = job.item.StartedAt
