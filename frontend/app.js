@@ -531,8 +531,8 @@ function drawTrendChart(dataPoints) {
             plugins: { 
                 legend: { display: false },
                 tooltip: {
-                    enabled: false, 
-                    external: externalTooltipHandler 
+                    enabled: false,
+                    external: (context) => universalTooltipHandler(context, { color: 'gray', id: 'chartjs-tooltip' })
                 }
             },
             scales: {
@@ -544,75 +544,84 @@ function drawTrendChart(dataPoints) {
     });
 }
 
-function externalTooltipHandler(context) {
-    let tooltipEl = document.getElementById('chartjs-tooltip');
+function universalTooltipHandler(context, config = { color: 'gray', id: 'main-tooltip' }) {
+    let tooltipEl = document.getElementById(config.id);
 
     if (!tooltipEl) {
         tooltipEl = document.createElement('div');
-        tooltipEl.id = 'chartjs-tooltip';
-        // Додаємо фіксовану ширину, щоб точніше розраховувати відступи
-        tooltipEl.classList.add('absolute', 'z-50', 'pointer-events-none', 'transition-all', 'duration-150', 'w-48');
+        tooltipEl.id = config.id;
+        tooltipEl.classList.add('absolute', 'z-50', 'pointer-events-none', 'transition-all', 'duration-150', 'w-64');
         document.body.appendChild(tooltipEl);
     }
 
     const tooltipModel = context.tooltip;
-
-    if (tooltipModel.opacity === 0) {
-        tooltipEl.style.opacity = 0;
-        return;
-    }
+    if (tooltipModel.opacity === 0) { tooltipEl.style.opacity = 0; return; }
 
     const dataIndex = tooltipModel.dataPoints[0].dataIndex;
-    const match = context.chart.data.datasets[0].customMatchData[dataIndex];
+    const dataset = context.chart.data.datasets[0];
+    const match = dataset.customMatchData[dataIndex];
     
-    const kills = parseInt(match.Kills) || 0;
-    const deaths = parseInt(match.Deaths) || 1;
-    const assists = parseInt(match.Assists) || 0;
-    const res = match.Result || match.i10 || "0";
-    const isWin = (res.toString() === "1" || res.toString() === "true");
-    const label = isWin ? "W" : "L";
-    const score = match.score ? match.score.replace(' / ', ':') : '-:-';
-    const mapName = match.map ? match.map.replace('de_', '') : 'Unknown';
+    let rawTime = match.CreatedAt1 || match.UpdatedAt1 || match.CreatedAt2 || match.UpdatedAt2 || match["Created At"] || match["Updated At"] || match.created_at || match.updated_at;
+    let dateStr = "Невідома дата";
+    if (rawTime) {
+        let ts = rawTime;
+        if (typeof ts === 'number' && ts < 10000000000) ts *= 1000;
+        let d = new Date(typeof ts === 'string' && isNaN(ts) ? ts.replace(' UTC', 'Z') : parseInt(ts));
+        if (!isNaN(d.getTime())) {
+            const datePart = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' р.', '');
+            const timePart = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
+            dateStr = `${datePart}, ${timePart}`;
+        }
+    }
+
+    const mapName = match.map ? match.map.replace('de_', '') : 'unknown';
     const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+    const score = match.score ? match.score.replace(' / ', ':') : '-:-';
+    const isWin = (match.Result === "1" || match.Win === "true");
+
+    let metricsHtml = '';
+    if (config.id === 'chartjs-tooltip') {
+        const kr = match["K/R Ratio"] || match.KRRatio || '-';
+        const hs = match["Headshots %"] || match.HeadshotsPc || '-';
+        const hsSuffix = hs !== '-' ? '%' : '';
+        
+        // Додали K/R та HS%
+        metricsHtml = `
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D/A</span><span class="text-white font-bold text-[13px]">${match.Kills}/${match.Deaths}/${match.Assists}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D</span><span class="${(match.Kills/match.Deaths) >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${(match.Kills/match.Deaths).toFixed(2)}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/R</span><span class="text-white font-bold text-[13px]">${kr}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">HS%</span><span class="text-white font-bold text-[13px]">${hs}${hsSuffix}</span></div>
+        `;
+    } else {
+        const metricName = document.getElementById('panelMetricName').textContent;
+        metricsHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[11px]">${metricName}</span><span class="text-white font-bold text-[13px]">${tooltipModel.dataPoints[0].formattedValue}</span></div>`;
+    }
 
     tooltipEl.innerHTML = `
-        <div class="bg-[#18181b]/95 border border-gray-700 rounded-lg shadow-2xl p-3 backdrop-blur-sm">
-            <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
-                <div class="flex items-center gap-2">
-                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-5 h-5 object-contain">
-                    <span class="text-[11px] font-bold text-gray-300 capitalize">${mapName}</span>
+        <div class="bg-[#18181b]/98 border ${config.color === 'indigo' ? 'border-indigo-500/50' : 'border-gray-700'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
+            <div class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 italic">${dateStr}</div>
+            <div class="flex justify-between items-center mb-3">
+                <div class="flex items-center gap-3">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-7 h-7 object-contain">
+                    <span class="text-sm font-bold text-white capitalize">${mapName}</span>
                 </div>
-                <span class="text-[10px] font-black ${isWin ? 'text-green-500' : 'text-red-500'} bg-black/40 px-1.5 py-0.5 rounded border border-gray-800">
-                    ${label} ${score}
+                <span class="text-xs font-black text-white ${config.color === 'indigo' ? 'bg-indigo-500/20 border-indigo-500/30' : 'bg-black/40 border-gray-800'} px-2 py-1 rounded border">
+                    ${isWin ? 'W' : 'L'} ${score}
                 </span>
             </div>
-            <div class="space-y-1.5 text-[11px] font-mono">
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">K/D/A</span><span class="text-white font-bold">${kills}/${deaths}/${assists}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">K/D</span><span class="${kills/deaths >= 1 ? 'text-green-400' : 'text-red-400'} font-bold">${(kills/deaths).toFixed(2)}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">ADR</span><span class="text-white font-bold">${match.ADR || '-'}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">HS%</span><span class="text-white font-bold">${match["Headshots %"] || match.HeadshotsPc || '-'}%</span></div>
-            </div>
+            <div class="space-y-2 font-mono">${metricsHtml}</div>
         </div>
     `;
 
     const position = context.chart.canvas.getBoundingClientRect();
     const chartWidth = context.chart.width;
-    const tooltipWidth = tooltipEl.offsetWidth;
-
- 
-    let leftPos;
-    if (tooltipModel.caretX > chartWidth * 0.5) {
-        leftPos = position.left + window.pageXOffset + tooltipModel.caretX - tooltipWidth - 20;
-    } else {
-        leftPos = position.left + window.pageXOffset + tooltipModel.caretX + 20;
-    }
-
-    const stableTop = position.top + window.pageYOffset + 10; 
-    const verticalShift = (tooltipModel.caretY * 0.15); 
+    let leftPos = (tooltipModel.caretX > chartWidth * 0.5) 
+        ? position.left + window.pageXOffset + tooltipModel.caretX - tooltipEl.offsetWidth - 25
+        : position.left + window.pageXOffset + tooltipModel.caretX + 25;
 
     tooltipEl.style.opacity = 1;
     tooltipEl.style.left = leftPos + 'px';
-    tooltipEl.style.top = stableTop + verticalShift + 'px';
+    tooltipEl.style.top = position.top + window.pageYOffset + 15 + (tooltipModel.caretY * 0.1) + 'px';
 }
 
 function changeChart(metric) {
@@ -637,19 +646,40 @@ function changeChart(metric) {
         displayAvg = (dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length).toFixed(1);
     }
 
-    if (myChart) myChart.destroy();
+if (myChart) myChart.destroy();
     myChart = new Chart(document.getElementById('performanceChart').getContext('2d'), {
         type: 'line',
         data: {
             labels: currentMatchHistory.map((_, i) => i + 1),
-            datasets: [{ data: dataPoints, borderColor: '#6366f1', borderWidth: 2, pointRadius: 0, tension: 0.1 }]
+            datasets: [{ 
+                data: dataPoints, 
+                customMatchData: currentMatchHistory, 
+                borderColor: '#6366f1', 
+                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                borderWidth: 2, 
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                fill: true,
+                tension: 0.2 
+            }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+            responsive: true, 
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    enabled: false,
+                    external: (context) => universalTooltipHandler(context, { color: 'indigo', id: 'performance-chart-tooltip' })
+                }
+            },
             scales: {
                 x: { grid: { color: '#27272a' }, ticks: { color: '#71717a' } },
-                y: { grid: { color: '#27272a' }, ticks: { color: '#71717a' }, beginAtZero: true }
+                y: { grid: { color: '#27272a' }, ticks: { color: '#71717a' } }
+            },
+            interaction: { 
+                mode: 'index', 
+                intersect: false 
             }
         }
     });
