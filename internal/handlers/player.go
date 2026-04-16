@@ -9,10 +9,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
-	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
 
-func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
+type Database interface {
+	GetPlayer(nickname string) (*faceit.PlayerProfile, error)
+	SavePlayer(profile *faceit.PlayerProfile) error
+}
+
+func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
