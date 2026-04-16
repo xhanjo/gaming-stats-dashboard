@@ -239,6 +239,48 @@ func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey
 	return nil, fmt.Errorf("гравця %s не знайдено в матчі %s", targetPlayerID, matchID)
 }
 
+func CalculateStatsFromHistory(formHistory []PlayerMatchStats) *RecentForm {
+	if len(formHistory) == 0 {
+		return nil
+	}
+
+	var totalKills, totalADR, totalHS, totalKR float64
+	var totalEntry, totalSniper int
+	var successfulMatches = len(formHistory)
+
+	for _, stats := range formHistory {
+		if val, err := strconv.ParseFloat(stats.Kills, 64); err == nil {
+			totalKills += val
+		}
+		if val, err := strconv.ParseFloat(stats.ADR, 64); err == nil {
+			totalADR += val
+		}
+		if val, err := strconv.ParseFloat(stats.HeadshotsPc, 64); err == nil {
+			totalHS += val
+		}
+		if val, err := strconv.ParseFloat(stats.KRRatio, 64); err == nil {
+			totalKR += val
+		}
+		if val, err := strconv.Atoi(stats.FirstKills); err == nil {
+			totalEntry += val
+		}
+		if val, err := strconv.Atoi(stats.SniperKills); err == nil {
+			totalSniper += val
+		}
+	}
+
+	return &RecentForm{
+		MatchesAnalyzed:  successfulMatches,
+		AvgKills:         totalKills / float64(successfulMatches),
+		AvgADR:           totalADR / float64(successfulMatches),
+		AvgHSPercentage:  totalHS / float64(successfulMatches),
+		AvgKRRatio:       totalKR / float64(successfulMatches),
+		TotalEntryKills:  totalEntry,
+		TotalSniperKills: totalSniper,
+		MatchHistory:     formHistory,
+	}
+}
+
 func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int) (*RecentForm, error) {
 	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit)
 	if err != nil {
@@ -270,7 +312,6 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				// 🔥 Передаємо ctx у воркери
 				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)
 
 				if err == nil && stats != nil {
@@ -299,53 +340,17 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 		}
 	}
 
-	var totalKills, totalADR, totalHS, totalKR float64
-	var totalEntry, totalSniper int
-	var successfulMatches int
 	var formHistory []PlayerMatchStats
-
 	for _, stats := range orderedHistory {
 		if stats == nil {
 			continue
 		}
 		formHistory = append(formHistory, *stats)
-
-		if val, err := strconv.ParseFloat(stats.Kills, 64); err == nil {
-			totalKills += val
-		}
-		if val, err := strconv.ParseFloat(stats.ADR, 64); err == nil {
-			totalADR += val
-		}
-		if val, err := strconv.ParseFloat(stats.HeadshotsPc, 64); err == nil {
-			totalHS += val
-		}
-		if val, err := strconv.ParseFloat(stats.KRRatio, 64); err == nil {
-			totalKR += val
-		}
-		if val, err := strconv.Atoi(stats.FirstKills); err == nil {
-			totalEntry += val
-		}
-		if val, err := strconv.Atoi(stats.SniperKills); err == nil {
-			totalSniper += val
-		}
-
-		successfulMatches++
 	}
 
-	if successfulMatches == 0 {
+	if len(formHistory) == 0 {
 		return nil, fmt.Errorf("не вдалося проаналізувати жодного матчу")
 	}
 
-	form := &RecentForm{
-		MatchesAnalyzed:  successfulMatches,
-		AvgKills:         totalKills / float64(successfulMatches),
-		AvgADR:           totalADR / float64(successfulMatches),
-		AvgHSPercentage:  totalHS / float64(successfulMatches),
-		AvgKRRatio:       totalKR / float64(successfulMatches),
-		TotalEntryKills:  totalEntry,
-		TotalSniperKills: totalSniper,
-		MatchHistory:     formHistory,
-	}
-
-	return form, nil
+	return CalculateStatsFromHistory(formHistory), nil
 }
