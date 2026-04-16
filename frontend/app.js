@@ -514,11 +514,12 @@ function drawTrendChart(dataPoints) {
             labels: dataPoints.map((_, i) => i + 1),
             datasets: [{
                 data: dataPoints,
+                customMatchData: currentMatchHistory,
                 borderColor: '#ff5500',
                 backgroundColor: gradient,
                 borderWidth: 2,
                 pointRadius: 0,
-                pointHoverRadius: 4,
+                pointHoverRadius: 6,
                 pointBackgroundColor: '#ff5500',
                 fill: true,
                 tension: 0.3
@@ -529,16 +530,89 @@ function drawTrendChart(dataPoints) {
             maintainAspectRatio: false,
             plugins: { 
                 legend: { display: false },
-                tooltip: { callbacks: { label: function(context) { return ' K/D: ' + context.parsed.y; } } }
+                tooltip: {
+                    enabled: false, 
+                    external: externalTooltipHandler 
+                }
             },
             scales: {
                 x: { display: false, offset: true }, 
                 y: { display: false, min: Math.min(...dataPoints) * 0.8 } 
             },
-            layout: { padding: 0 },
             interaction: { mode: 'index', intersect: false }
         }
     });
+}
+
+function externalTooltipHandler(context) {
+    let tooltipEl = document.getElementById('chartjs-tooltip');
+
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = 'chartjs-tooltip';
+        // Додаємо фіксовану ширину, щоб точніше розраховувати відступи
+        tooltipEl.classList.add('absolute', 'z-50', 'pointer-events-none', 'transition-all', 'duration-150', 'w-48');
+        document.body.appendChild(tooltipEl);
+    }
+
+    const tooltipModel = context.tooltip;
+
+    if (tooltipModel.opacity === 0) {
+        tooltipEl.style.opacity = 0;
+        return;
+    }
+
+    const dataIndex = tooltipModel.dataPoints[0].dataIndex;
+    const match = context.chart.data.datasets[0].customMatchData[dataIndex];
+    
+    const kills = parseInt(match.Kills) || 0;
+    const deaths = parseInt(match.Deaths) || 1;
+    const assists = parseInt(match.Assists) || 0;
+    const res = match.Result || match.i10 || "0";
+    const isWin = (res.toString() === "1" || res.toString() === "true");
+    const label = isWin ? "W" : "L";
+    const score = match.score ? match.score.replace(' / ', ':') : '-:-';
+    const mapName = match.map ? match.map.replace('de_', '') : 'Unknown';
+    const safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+
+    tooltipEl.innerHTML = `
+        <div class="bg-[#18181b]/95 border border-gray-700 rounded-lg shadow-2xl p-3 backdrop-blur-sm">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-2 mb-2">
+                <div class="flex items-center gap-2">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-5 h-5 object-contain">
+                    <span class="text-[11px] font-bold text-gray-300 capitalize">${mapName}</span>
+                </div>
+                <span class="text-[10px] font-black ${isWin ? 'text-green-500' : 'text-red-500'} bg-black/40 px-1.5 py-0.5 rounded border border-gray-800">
+                    ${label} ${score}
+                </span>
+            </div>
+            <div class="space-y-1.5 text-[11px] font-mono">
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">K/D/A</span><span class="text-white font-bold">${kills}/${deaths}/${assists}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">K/D</span><span class="${kills/deaths >= 1 ? 'text-green-400' : 'text-red-400'} font-bold">${(kills/deaths).toFixed(2)}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">ADR</span><span class="text-white font-bold">${match.ADR || '-'}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold">HS%</span><span class="text-white font-bold">${match["Headshots %"] || match.HeadshotsPc || '-'}%</span></div>
+            </div>
+        </div>
+    `;
+
+    const position = context.chart.canvas.getBoundingClientRect();
+    const chartWidth = context.chart.width;
+    const tooltipWidth = tooltipEl.offsetWidth;
+
+ 
+    let leftPos;
+    if (tooltipModel.caretX > chartWidth * 0.5) {
+        leftPos = position.left + window.pageXOffset + tooltipModel.caretX - tooltipWidth - 20;
+    } else {
+        leftPos = position.left + window.pageXOffset + tooltipModel.caretX + 20;
+    }
+
+    const stableTop = position.top + window.pageYOffset + 10; 
+    const verticalShift = (tooltipModel.caretY * 0.15); 
+
+    tooltipEl.style.opacity = 1;
+    tooltipEl.style.left = leftPos + 'px';
+    tooltipEl.style.top = stableTop + verticalShift + 'px';
 }
 
 function changeChart(metric) {
