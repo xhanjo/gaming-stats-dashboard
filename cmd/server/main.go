@@ -10,6 +10,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 
 	"github.com/xhanjo/gaming-stats-dashboard/internal/handlers"
@@ -29,21 +31,26 @@ func main() {
 
 	db, err := storage.New("stats.db")
 	if err != nil {
-		log.Fatal("Критична помилка: Не вдалося підключитися до БД:", err)
+		log.Fatal(err)
 	}
-
 	if err := db.InitTable(); err != nil {
-		log.Fatal("Критична помилка: Не вдалося ініціалізувати таблиці:", err)
+		log.Fatal(err)
 	}
-	log.Println("INFO: База даних SQLite успішно підключена!")
 
-	http.HandleFunc("/api/player", handlers.GetPlayerStats(db, apiKey))
+	log.Println("INFO: База даних SQLite успішно підключена!")
 
 	port := ":8080"
 
+	r := chi.NewRouter()
+
+	r.Use(middleware.Logger)
+	r.Use(middleware.Recoverer)
+
+	r.Get("/api/player/{nickname}", handlers.GetPlayerStats(db, apiKey))
+
 	srv := &http.Server{
 		Addr:    port,
-		Handler: http.DefaultServeMux,
+		Handler: r,
 	}
 
 	stopChan := make(chan os.Signal, 1)

@@ -116,7 +116,7 @@ async function searchPlayer(event) {
     toggleLoading(true);
 
     try {
-        const response = await fetch(`http://localhost:8080/api/player?nickname=${nickname}`);
+        const response = await fetch(`http://localhost:8080/api/player/${nickname}`);
         const data = await response.json();
 
         if (!response.ok) throw new Error(data.error || 'Гравця не знайдено');

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
@@ -18,7 +19,7 @@ func GetPlayerStats(db *storage.Storage, apiKey string) http.HandlerFunc {
 
 		ctx := r.Context()
 
-		nickname := r.URL.Query().Get("nickname")
+		nickname := chi.URLParam(r, "nickname")
 		if nickname == "" {
 			w.WriteHeader(http.StatusBadRequest)
 			fmt.Fprintf(w, `{"error": "Будь ласка, вкажіть параметр nickname"}`)
