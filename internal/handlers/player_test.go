@@ -20,9 +20,15 @@ func (m *MockDB) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 			Games: map[string]faceit.GameInfo{
 				"cs2": {FaceitElo: 2500, SkillLevel: 10},
 			},
+			// 🔥 ДОДАНО: Фейкова історія матчів, щоб пройти перевірку на "зламаний кеш"
+			Recent: &faceit.RecentForm{
+				MatchHistory: []faceit.PlayerMatchStats{
+					{MatchId: "mock_match_123", Kills: "20", Deaths: "10"},
+				},
+			},
 		}, nil
 	}
-	return nil, nil
+	return nil, nil // Імітуємо sql.ErrNoRows для невідомих гравців
 }
 
 func (m *MockDB) SavePlayer(profile *faceit.PlayerProfile) error {

@@ -271,7 +271,7 @@ async function searchPlayer(event, limit = 30, isDeepScan = false) {
                 const color = isWin ? "bg-green-500" : "bg-red-500";
                 const label = isWin ? "W" : "L";
 
-                return `<div class="flex-1 flex justify-center"><div class="w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6 ${color} rounded text-[8px] sm:text-[10px] flex items-center justify-center text-white font-bold shadow-sm" title="Kills: ${kills}">${label}</div></div>`;      
+                return `<div class="flex-1 px-[1px] flex justify-center"><div class="w-full max-w-[24px] aspect-square ${color} rounded-sm flex items-center justify-center text-white font-bold shadow-sm text-[6px] sm:text-[10px] leading-none" title="Kills: ${kills}">${label}</div></div>`;      
             }).join('');
             
             document.getElementById('matchResults').innerHTML = historyHtml;
