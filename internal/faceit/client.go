@@ -119,7 +119,6 @@ func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProf
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
 	resp, err := httpClient.Do(req)
@@ -136,7 +135,6 @@ func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProf
 	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
 		return nil, err
 	}
-
 	return &profile, nil
 }
 
@@ -147,7 +145,6 @@ func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error
 	if err != nil {
 		return nil, err
 	}
-
 	req.Header.Add("Authorization", "Bearer "+apiKey)
 
 	resp, err := httpClient.Do(req)
@@ -164,36 +161,59 @@ func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error
 	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
 		return nil, err
 	}
-
 	return &stats, nil
 }
 
-func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int, offset int) ([]MatchHistoryItem, error) {
-	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=%d&limit=%d", playerID, offset, limit)
+func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
+	var allItems []MatchHistoryItem
+	batchSize := 20
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
+	for offset := 0; offset < limit; offset += batchSize {
+		if offset > 0 {
+			time.Sleep(100 * time.Millisecond)
+		}
+
+		fetchSize := batchSize
+		if limit-offset < batchSize {
+			fetchSize = limit - offset
+		}
+
+		url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=%d&limit=%d", playerID, offset, fetchSize)
+
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Add("Authorization", "Bearer "+apiKey)
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			if len(allItems) > 0 {
+				break
+			}
+			return nil, fmt.Errorf("помилка отримання історії матчів: статус %d", resp.StatusCode)
+		}
+
+		var historyResponse MatchHistoryResponse
+		if err := json.NewDecoder(resp.Body).Decode(&historyResponse); err != nil {
+			resp.Body.Close()
+			return nil, err
+		}
+		resp.Body.Close()
+
+		allItems = append(allItems, historyResponse.Items...)
+
+		if len(historyResponse.Items) < fetchSize {
+			break
+		}
 	}
 
-	req.Header.Add("Authorization", "Bearer "+apiKey)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("помилка отримання історії матчів: статус %d", resp.StatusCode)
-	}
-
-	var historyResponse MatchHistoryResponse
-	if err := json.NewDecoder(resp.Body).Decode(&historyResponse); err != nil {
-		return nil, err
-	}
-
-	return historyResponse.Items, nil
+	return allItems, nil
 }
 
 func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
@@ -230,7 +250,6 @@ func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey
 				player.PlayerStats.Map = matchResp.Rounds[0].RoundStats["Map"]
 				player.PlayerStats.Score = matchResp.Rounds[0].RoundStats["Score"]
 				player.PlayerStats.MatchId = matchID
-
 				return &player.PlayerStats, nil
 			}
 		}
@@ -281,8 +300,8 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats) *RecentForm {
 	}
 }
 
-func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int, offset int) (*RecentForm, error) {
-	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit, offset)
+func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int) (*RecentForm, error) {
+	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -312,8 +331,6 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				// 🔥 Throttling: мікро-затримка, щоб не отримати бан від Faceit (HTTP 429)
-				// 50 мілісекунд * 4 воркера = плавне викачування без перевантаження API
 				time.Sleep(50 * time.Millisecond)
 
 				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)

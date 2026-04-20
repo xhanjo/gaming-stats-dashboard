@@ -32,33 +32,27 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 		}
 
 		limitStr := r.URL.Query().Get("limit")
-		offsetStr := r.URL.Query().Get("offset")
-
-		limit := 20
+		limit := 30
 		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
 			limit = l
 		}
 
-		offset := 0
-		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
-			offset = o
-		}
-
 		profile, err := db.GetPlayer(nickname)
-		if err == nil && limit <= 20 {
+
+		if err == nil && limit <= 30 && profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
 			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
 			json.NewEncoder(w).Encode(profile)
 			return
 		}
 
-		if err != sql.ErrNoRows && limit <= 20 {
-			log.Printf("ERROR: Помилка читання з БД: %v", err)
+		if err != sql.ErrNoRows && limit <= 30 {
+			log.Printf("ERROR: Помилка читання з БД (або кеш порожній/зламаний): %v", err)
 		}
 
-		if limit > 20 {
-			log.Printf("INFO: Запущено ГЛИБОКИЙ АНАЛІЗ для [%s] (limit=%d, offset=%d)", nickname, limit, offset)
+		if limit > 30 {
+			log.Printf("INFO: Запущено ГЛИБОКИЙ АНАЛІЗ для [%s] (limit=%d)", nickname, limit)
 		} else {
-			log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
+			log.Printf("INFO: Кеш порожній або застарів. Запит до Faceit API для [%s] (limit=%d)...", nickname, limit)
 		}
 
 		profile, err = faceit.GetPlayerProfile(ctx, nickname, apiKey)
@@ -75,7 +69,7 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Не вдалося отримати загальну статистику: %v", err)
 		}
 
-		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit, offset)
+		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit)
 		if err == nil {
 			profile.Recent = recentForm
 			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)
@@ -83,11 +77,15 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Не вдалося розрахувати форму: %v", err)
 		}
 
-		err = db.SavePlayer(profile)
-		if err != nil {
-			log.Printf("ERROR: Помилка збереження в БД: %v", err)
+		if profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
+			err = db.SavePlayer(profile)
+			if err != nil {
+				log.Printf("ERROR: Помилка збереження в БД: %v", err)
+			} else {
+				log.Printf("INFO: Дані гравця [%s] успішно збережено в БД", nickname)
+			}
 		} else {
-			log.Printf("INFO: Дані гравця [%s] збережено в БД", nickname)
+			log.Printf("WARN: Дані не збережено в БД, оскільки історія матчів порожня")
 		}
 
 		json.NewEncoder(w).Encode(profile)

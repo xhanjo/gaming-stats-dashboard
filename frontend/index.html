@@ -256,12 +256,19 @@
             >
               Активність
             </button>
+            <button
+              id="btn-tab-analytics"
+              onclick="switchTab('tab-analytics')"
+              class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
+            >
+              Аналітика
+            </button>
           </div>
 
           <button
             id="deepScanBtn"
-            onclick="searchPlayer(null, 100)"
-            class="flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-t-lg hover:bg-indigo-500/20 transition-colors mb-2 sm:mb-2 group"
+            onclick="searchPlayer(null, 100, true)"
+            class="flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors mb-2 sm:mb-2 group"
           >
             <svg
               class="w-3.5 h-3.5 group-hover:animate-pulse"
@@ -334,7 +341,7 @@
               <h3
                 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider"
               >
-                Форма (останні 20 матчів)
+                Форма (останні 30 матчів)
               </h3>
               <div class="grid grid-cols-2 gap-4">
                 <div class="bg-gray-800/30 p-3 rounded-lg text-center">
@@ -508,6 +515,15 @@
                 class="divide-y divide-gray-800/50"
               ></tbody>
             </table>
+            <div class="mt-6 flex justify-center">
+              <button
+                id="loadMoreMatchesBtn"
+                onclick="loadMoreMatches()"
+                class="hidden px-6 py-2 bg-[#18181b] hover:bg-gray-800 border border-gray-700 rounded-lg text-sm font-bold text-gray-300 hover:text-white transition-colors"
+              >
+                Завантажити ще
+              </button>
+            </div>
           </div>
         </div>
 
@@ -714,6 +730,45 @@
                 Немає</span
               >
             </div>
+          </div>
+        </div>
+
+        <div id="tab-analytics" class="hidden mt-6">
+          <div
+            class="bg-card border border-gray-800 rounded-2xl p-8 text-center py-20 shadow-xl"
+          >
+            <div
+              class="w-16 h-16 bg-indigo-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-indigo-500/30"
+            >
+              <svg
+                class="w-8 h-8 text-indigo-400 animate-spin"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
+                ></path>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"
+                ></path>
+              </svg>
+            </div>
+            <h3
+              class="text-xl font-bold text-white mb-2 uppercase tracking-widest"
+            >
+              Модуль Analytics Pro
+            </h3>
+            <p class="text-gray-500 max-w-md mx-auto">
+              Для роботи алгоритмів регресії та кластеризації рекомендується
+              виконати <span class="text-indigo-400">Глибокий аналіз</span>.
+            </p>
           </div>
         </div>
       </div>

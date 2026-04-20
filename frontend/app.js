@@ -2,11 +2,15 @@ let myChart = null;
 let trendChart = null; 
 let dailyChart = null; 
 let weeklyChart = null; 
+let rawMatchHistory = []; 
 let currentMatchHistory = []; 
 let trueKDVal = "0.00"; 
 
+let displayedMatchesCount = 0;
+const MATCHES_PER_PAGE = 20;
+
 function switchTab(tabId) {
-    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity'];
+    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity', 'tab-analytics'];
     
     tabs.forEach(id => {
         const el = document.getElementById(id);
@@ -71,7 +75,7 @@ function resetUI() {
     const mapContainer = document.getElementById('mapStatsContainer');
     if (mapContainer) mapContainer.innerHTML = "";
     
-    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity'];
+    const tabs = ['tab-summary', 'tab-matches', 'tab-maps', 'tab-activity', 'tab-analytics'];
     tabs.forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
@@ -107,18 +111,31 @@ function toggleLoading(isLoading) {
     }
 }
 
-async function searchPlayer(event, limit = 20) { 
+function getMatchTimestamp(m) {
+    let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.CreatedAt2 || m.UpdatedAt2 || m["Created At"] || m["Updated At"] || m.created_at || m.updated_at;
+    if (!rawTime) return 0;
+    if (typeof rawTime === 'number') return rawTime * (rawTime < 10000000000 ? 1000 : 1);
+    if (typeof rawTime === 'string' && !isNaN(rawTime)) return parseInt(rawTime) * (parseInt(rawTime) < 10000000000 ? 1000 : 1);
+    if (typeof rawTime === 'string') return new Date(rawTime.replace(' UTC', 'Z')).getTime();
+    return 0;
+}
+
+async function searchPlayer(event, limit = 30, isDeepScan = false) { 
     if (event) event.preventDefault();
     const nickname = document.getElementById('nicknameInput').value.trim();
     if (!nickname) return;
 
-    resetUI();
-    toggleLoading(true);
+    if (!isDeepScan) {
+        rawMatchHistory = [];
+        currentMatchHistory = [];
+        resetUI();
+        toggleLoading(true);
+    }
 
     const deepScanBtn = document.getElementById('deepScanBtn');
-    if (deepScanBtn && limit > 20) {
+    if (deepScanBtn && isDeepScan) {
         deepScanBtn.innerHTML = `<div class="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin"></div> Сканування...`;
-        deepScanBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        deepScanBtn.disabled = true;
     }
 
     try {
@@ -219,16 +236,32 @@ async function searchPlayer(event, limit = 20) {
         }
 
         if (data.recent_form && data.recent_form.match_history) {
-            let totalKills = 0, totalDeaths = 0;
+            let fetchedMatches = data.recent_form.match_history;
+            
+            rawMatchHistory = fetchedMatches;
+            
+            rawMatchHistory.sort((a, b) => getMatchTimestamp(b) - getMatchTimestamp(a));
+            
+            const uniqueMatches = [];
+            const seenIds = new Set();
+            rawMatchHistory.forEach(m => {
+                const id = m["Match Id"] || m.match_id;
+                if (id && !seenIds.has(id)) {
+                    seenIds.add(id);
+                    uniqueMatches.push(m);
+                }
+            });
+            rawMatchHistory = uniqueMatches;
+
+            const last30Matches = rawMatchHistory.slice(0, 30);
+            const chronologicalHistory = [...last30Matches].reverse();
+
+            let tKills = 0, tDeaths = 0, tADR = 0, tHS = 0, tKR = 0, tEntry = 0, tSniper = 0;
             let trendData = []; 
-            const last20Matches = data.recent_form.match_history.slice(0, 20);
-            const chronologicalHistory = [...last20Matches].reverse();
 
             const historyHtml = chronologicalHistory.map(m => {
                 const kills = parseInt(m.Kills) || 0;
                 const deaths = parseInt(m.Deaths) || 1;
-                totalKills += kills;
-                totalDeaths += deaths;
                 
                 trendData.push((kills / deaths).toFixed(2));
                 
@@ -242,25 +275,37 @@ async function searchPlayer(event, limit = 20) {
             }).join('');
             
             document.getElementById('matchResults').innerHTML = historyHtml;
-            trueKDVal = totalDeaths > 0 ? (totalKills / totalDeaths).toFixed(2) : "0.00";
 
+            last30Matches.forEach(m => {
+                tKills += parseInt(m.Kills) || 0;
+                tDeaths += parseInt(m.Deaths) || 1;
+                tADR += parseFloat(m.ADR) || 0;
+                tHS += parseFloat(m['Headshots %'] || m.HeadshotsPc) || 0;
+                tKR += parseFloat(m['K/R Ratio'] || m.KRRatio) || 0;
+                tEntry += parseInt(m['First Kills'] || m.FirstKills) || 0;
+                tSniper += parseInt(m['Sniper Kills'] || m.SniperKills) || 0;
+            });
+
+            const validMatches = last30Matches.length || 1;
+
+            trueKDVal = (tKills / (tDeaths || 1)).toFixed(2);
             document.getElementById('playerKD').textContent = trueKDVal;
-            document.getElementById('playerKR').textContent = data.recent_form.avg_kr_ratio.toFixed(2);
-            document.getElementById('playerADR').textContent = data.recent_form.avg_adr.toFixed(1);
-            document.getElementById('playerHS').textContent = data.recent_form.avg_hs_percentage.toFixed(1) + '%';
-            document.getElementById('playerEntry').textContent = data.recent_form.total_entry_kills;
-            document.getElementById('playerSniper').textContent = data.recent_form.total_sniper_kills;
+            document.getElementById('playerKR').textContent = (tKR / validMatches).toFixed(2);
+            document.getElementById('playerADR').textContent = (tADR / validMatches).toFixed(1);
+            document.getElementById('playerHS').textContent = (tHS / validMatches).toFixed(1) + '%';
+            document.getElementById('playerEntry').textContent = tEntry;
+            document.getElementById('playerSniper').textContent = tSniper;
 
             currentMatchHistory = chronologicalHistory;
             drawTrendChart(trendData);
             changeChart('kd');
 
-            renderPlayActivity(data.recent_form.match_history);
-            renderMatchTable(chronologicalHistory.slice().reverse()); 
+            renderPlayActivity(rawMatchHistory);
+            renderMatchTable(true); 
         }
 
         document.getElementById('playerCard').classList.remove('hidden');
-        switchTab('tab-summary'); 
+        if (!isDeepScan) switchTab('tab-summary'); 
 
     } catch (error) {
         document.getElementById('errorMessage').textContent = error.message;
@@ -270,18 +315,23 @@ async function searchPlayer(event, limit = 20) {
         const deepScanBtn = document.getElementById('deepScanBtn');
         if (deepScanBtn) {
             deepScanBtn.innerHTML = `<svg class="w-3.5 h-3.5 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg> Глибокий аналіз (100 матчів)`;
-            deepScanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            deepScanBtn.disabled = false;
         }
     }
 }
 
-function renderMatchTable(matches) {
+function renderMatchTable(reset = false) {
     const tbody = document.getElementById('matchHistoryTableBody');
-    tbody.innerHTML = '';
+    const loadBtn = document.getElementById('loadMoreMatchesBtn');
+    
+    if (reset) {
+        tbody.innerHTML = '';
+        displayedMatchesCount = 0;
+    }
 
-    const recent20 = matches.slice(0, 20);
+    const nextMatches = rawMatchHistory.slice(displayedMatchesCount, displayedMatchesCount + MATCHES_PER_PAGE);
 
-    recent20.forEach(m => {
+    let rowsHtml = nextMatches.map(m => {
         const mapNameRaw = m.map ? m.map.replace('de_', '') : 'Unknown';
         const safeMapName = mapNameRaw.toLowerCase().replace(/\s+/g, '');
         const mapDisplay = mapNameRaw.charAt(0).toUpperCase() + mapNameRaw.slice(1);
@@ -294,7 +344,7 @@ function renderMatchTable(matches) {
         const kills = parseInt(m.Kills) || 0;
         const deaths = parseInt(m.Deaths) || 1;
         const assists = parseInt(m.Assists) || 0;
-        const kd = (kills / deaths).toFixed(2);
+        const kd = (kills / (deaths || 1)).toFixed(2);
         const kdColor = kd >= 1 ? 'text-green-400' : 'text-red-400';
 
         const score = m.score ? m.score.replace(' / ', ':') : '-:-';
@@ -313,7 +363,7 @@ function renderMatchTable(matches) {
             }
         }
 
-        const row = `
+        return `
         <tr class="hover:bg-gray-800/30 transition-colors group text-[11px] md:text-sm">
             <td class="py-3 pr-4 pl-2 text-gray-400 font-bold whitespace-nowrap">${dateStr}</td>
             <td class="py-3 pr-4">
@@ -337,8 +387,27 @@ function renderMatchTable(matches) {
             <td class="py-3 font-mono font-bold text-gray-300">${hsText}</td>
         </tr>
         `;
-        tbody.innerHTML += row;
-    });
+    }).join('');
+
+    if (reset) {
+        tbody.innerHTML = rowsHtml;
+    } else {
+        tbody.innerHTML += rowsHtml;
+    }
+
+    displayedMatchesCount += nextMatches.length;
+
+    if (loadBtn) {
+        if (displayedMatchesCount >= rawMatchHistory.length) {
+            loadBtn.classList.add('hidden');
+        } else {
+            loadBtn.classList.remove('hidden');
+        }
+    }
+}
+
+function loadMoreMatches() {
+    renderMatchTable(false);
 }
 
 function renderPlayActivity(matches) {
@@ -353,6 +422,11 @@ function renderPlayActivity(matches) {
     let totalWins = 0;
     let currentMonthMatches = 0;
     let uniqueDays = new Set();
+
+    let sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    sixMonthsAgo.setDate(1);
+    sixMonthsAgo.setHours(0, 0, 0, 0);
 
     matches.forEach((m, index) => {
         let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.CreatedAt2 || m.UpdatedAt2 || m["Created At"] || m["Updated At"] || m.created_at || m.updated_at;
@@ -380,26 +454,28 @@ function renderPlayActivity(matches) {
             d.setHours(12, 0, 0, 0);
         }
 
-        totalMatches++;
-        const res = m.Result || m.i10 || m.Win || m.win || "0";
-        const isWin = (res.toString() === "1" || res.toString() === "true");
-        if (isWin) totalWins++;
+        if (d >= sixMonthsAgo) {
+            totalMatches++;
+            const res = m.Result || m.i10 || m.Win || m.win || "0";
+            const isWin = (res.toString() === "1" || res.toString() === "true");
+            if (isWin) totalWins++;
 
-        let hour = d.getHours();
-        hoursData[hour].m++;
-        if(isWin) hoursData[hour].w++;
+            let hour = d.getHours();
+            hoursData[hour].m++;
+            if(isWin) hoursData[hour].w++;
 
-        let day = d.getDay();
-        let jsDay = day === 0 ? 6 : day - 1; 
-        daysData[jsDay].m++;
-        if(isWin) daysData[jsDay].w++;
+            let day = d.getDay();
+            let jsDay = day === 0 ? 6 : day - 1; 
+            daysData[jsDay].m++;
+            if(isWin) daysData[jsDay].w++;
 
-        let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        uniqueDays.add(dateStr);
-        matchCountsByDate[dateStr] = (matchCountsByDate[dateStr] || 0) + 1;
+            let dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            uniqueDays.add(dateStr);
+            matchCountsByDate[dateStr] = (matchCountsByDate[dateStr] || 0) + 1;
 
-        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
-            currentMonthMatches++;
+            if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+                currentMonthMatches++;
+            }
         }
     });
     
@@ -656,7 +732,7 @@ function changeChart(metric) {
         displayAvg = (dataPoints.reduce((a, b) => a + b, 0) / dataPoints.length).toFixed(1);
     }
 
-if (myChart) myChart.destroy();
+    if (myChart) myChart.destroy();
     myChart = new Chart(document.getElementById('performanceChart').getContext('2d'), {
         type: 'line',
         data: {
