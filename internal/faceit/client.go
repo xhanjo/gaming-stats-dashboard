@@ -168,8 +168,8 @@ func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error
 	return &stats, nil
 }
 
-func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
-	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=0&limit=%d", playerID, limit)
+func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int, offset int) ([]MatchHistoryItem, error) {
+	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=%d&limit=%d", playerID, offset, limit)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -281,8 +281,8 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats) *RecentForm {
 	}
 }
 
-func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int) (*RecentForm, error) {
-	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit)
+func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int, offset int) (*RecentForm, error) {
+	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -312,6 +312,10 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
+				// 🔥 Throttling: мікро-затримка, щоб не отримати бан від Faceit (HTTP 429)
+				// 50 мілісекунд * 4 воркера = плавне викачування без перевантаження API
+				time.Sleep(50 * time.Millisecond)
+
 				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)
 
 				if err == nil && stats != nil {

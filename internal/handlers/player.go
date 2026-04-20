@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
@@ -30,18 +31,35 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			return
 		}
 
+		limitStr := r.URL.Query().Get("limit")
+		offsetStr := r.URL.Query().Get("offset")
+
+		limit := 20
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+
+		offset := 0
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+
 		profile, err := db.GetPlayer(nickname)
-		if err == nil {
+		if err == nil && limit <= 20 {
 			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
 			json.NewEncoder(w).Encode(profile)
 			return
 		}
 
-		if err != sql.ErrNoRows {
+		if err != sql.ErrNoRows && limit <= 20 {
 			log.Printf("ERROR: Помилка читання з БД: %v", err)
 		}
 
-		log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
+		if limit > 20 {
+			log.Printf("INFO: Запущено ГЛИБОКИЙ АНАЛІЗ для [%s] (limit=%d, offset=%d)", nickname, limit, offset)
+		} else {
+			log.Printf("INFO: Гравця [%s] немає в базі (або дані застаріли), запит до Faceit API...", nickname)
+		}
 
 		profile, err = faceit.GetPlayerProfile(ctx, nickname, apiKey)
 		if err != nil {
@@ -57,7 +75,7 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Не вдалося отримати загальну статистику: %v", err)
 		}
 
-		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, 20)
+		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit, offset)
 		if err == nil {
 			profile.Recent = recentForm
 			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)

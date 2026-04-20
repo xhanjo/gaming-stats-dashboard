@@ -222,37 +222,63 @@
           </div>
         </div>
 
-        <div class="flex gap-6 border-b border-gray-800 px-2 mt-6">
-          <button
-            id="btn-tab-summary"
-            onclick="switchTab('tab-summary')"
-            class="tab-btn pb-3 text-sm font-bold text-faceit border-b-2 border-faceit transition-all"
+        <div
+          class="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-gray-800 px-2 mt-6 gap-4 pb-0"
+        >
+          <div
+            class="flex gap-6 overflow-x-auto scrollbar-hide w-full sm:w-auto"
           >
-            Огляд
-          </button>
+            <button
+              id="btn-tab-summary"
+              onclick="switchTab('tab-summary')"
+              class="tab-btn pb-3 text-sm font-bold text-faceit border-b-2 border-faceit transition-all"
+            >
+              Огляд
+            </button>
+            <button
+              id="btn-tab-matches"
+              onclick="switchTab('tab-matches')"
+              class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
+            >
+              Історія матчів
+            </button>
+            <button
+              id="btn-tab-maps"
+              onclick="switchTab('tab-maps')"
+              class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
+            >
+              Мапи
+            </button>
+            <button
+              id="btn-tab-activity"
+              onclick="switchTab('tab-activity')"
+              class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
+            >
+              Активність
+            </button>
+          </div>
+
           <button
-            id="btn-tab-matches"
-            onclick="switchTab('tab-matches')"
-            class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
+            id="deepScanBtn"
+            onclick="searchPlayer(null, 100)"
+            class="flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-t-lg hover:bg-indigo-500/20 transition-colors mb-2 sm:mb-2 group"
           >
-            Історія матчів
-          </button>
-          <button
-            id="btn-tab-maps"
-            onclick="switchTab('tab-maps')"
-            class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
-          >
-            Мапи
-          </button>
-          <button
-            id="btn-tab-activity"
-            onclick="switchTab('tab-activity')"
-            class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all"
-          >
-            Активність
+            <svg
+              class="w-3.5 h-3.5 group-hover:animate-pulse"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"
+              ></path>
+            </svg>
+            Глибокий аналіз (100 матчів)
           </button>
         </div>
-
         <div id="tab-summary" class="space-y-6 mt-6">
           <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
             <h3

@@ -107,7 +107,7 @@ function toggleLoading(isLoading) {
     }
 }
 
-async function searchPlayer(event) {
+async function searchPlayer(event, limit = 20) { 
     if (event) event.preventDefault();
     const nickname = document.getElementById('nicknameInput').value.trim();
     if (!nickname) return;
@@ -115,8 +115,14 @@ async function searchPlayer(event) {
     resetUI();
     toggleLoading(true);
 
+    const deepScanBtn = document.getElementById('deepScanBtn');
+    if (deepScanBtn && limit > 20) {
+        deepScanBtn.innerHTML = `<div class="w-3 h-3 border-2 border-indigo-400/30 border-t-indigo-400 rounded-full animate-spin"></div> Сканування...`;
+        deepScanBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+
     try {
-        const response = await fetch(`http://localhost:8080/api/player/${nickname}`);
+        const response = await fetch(`http://localhost:8080/api/player/${nickname}?limit=${limit}`);
         const data = await response.json();
 
         if (!response.ok) throw new Error(data.error || 'Гравця не знайдено');
@@ -261,6 +267,11 @@ async function searchPlayer(event) {
         document.getElementById('errorMessage').style.display = 'block';
     } finally {
         toggleLoading(false);
+        const deepScanBtn = document.getElementById('deepScanBtn');
+        if (deepScanBtn) {
+            deepScanBtn.innerHTML = `<svg class="w-3.5 h-3.5 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path></svg> Глибокий аналіз (100 матчів)`;
+            deepScanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     }
 }
 
@@ -585,7 +596,6 @@ function universalTooltipHandler(context, config = { color: 'gray', id: 'main-to
         const hs = match["Headshots %"] || match.HeadshotsPc || '-';
         const hsSuffix = hs !== '-' ? '%' : '';
         
-        // Додали K/R та HS%
         metricsHtml = `
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D/A</span><span class="text-white font-bold text-[13px]">${match.Kills}/${match.Deaths}/${match.Assists}</span></div>
             <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D</span><span class="${(match.Kills/match.Deaths) >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${(match.Kills/match.Deaths).toFixed(2)}</span></div>
