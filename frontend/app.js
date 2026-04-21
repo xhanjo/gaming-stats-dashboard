@@ -7,6 +7,7 @@ let currentMatchHistory = [];
 let trueKDVal = "0.00"; 
 let radarChart = null; 
 let eloChart = null;
+let stabilityChart = null;
 
 let displayedMatchesCount = 0;
 const MATCHES_PER_PAGE = 20;
@@ -507,24 +508,34 @@ function renderAnalytics(recentForm, currentElo, matches) {
     let m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
     let b = (sumY - m * sumX) / n;
     
-    let predictedElo = Math.round(m * (n + 1) + b);
+    let futureSteps = 5;
+    let futureEloArray = [];
+    let futureLabels = [];
+    let futureColors = [];
+
+    for (let i = 1; i <= futureSteps; i++) {
+        futureEloArray.push(Math.round(m * (n + i) + b));
+        futureLabels.push(i === futureSteps ? 'Прогноз' : `+${i}`);
+        futureColors.push('#10b981'); 
+    }
+
+    let finalPredictedElo = futureEloArray[futureSteps - 1]; 
     let trendVal = m;
 
-    document.getElementById('predictedEloText').textContent = predictedElo || currentElo || "-";
+    document.getElementById('predictedEloText').textContent = finalPredictedElo || currentElo || "-";
     
     let trendEl = document.getElementById('eloTrendText');
     if (trendVal > 0.5) {
-        trendEl.innerHTML = `<span class="text-green-500">↑ +${trendVal.toFixed(1)} за матч</span>`;
+        trendEl.innerHTML = `<span class="text-green-500">Тренд: ↑ +${trendVal.toFixed(1)} Elo/гру</span>`;
     } else if (trendVal < -0.5) {
-        trendEl.innerHTML = `<span class="text-red-500">↓ ${Math.abs(trendVal).toFixed(1)} за матч</span>`;
+        trendEl.innerHTML = `<span class="text-red-500">Тренд: ↓ ${Math.abs(trendVal).toFixed(1)} Elo/гру</span>`;
     } else {
-        trendEl.innerHTML = `<span class="text-gray-400">Стабільно</span>`;
+        trendEl.innerHTML = `<span class="text-gray-400">Тренд: Стабільний</span>`;
     }
 
-    let labels = Array.from({length: validMatches + 1}, (_, i) => i === validMatches ? 'Прогноз' : i + 1);
-    let dataPoints = [...eloHistory, predictedElo];
-    let pointColors = Array(validMatches).fill('#ff5500');
-    pointColors.push('#10b981'); 
+    let labels = Array.from({length: validMatches}, (_, i) => i + 1).concat(futureLabels);
+    let dataPoints = [...eloHistory, ...futureEloArray];
+    let pointColors = Array(validMatches).fill('#ff5500').concat(futureColors);
 
     if (eloChart) eloChart.destroy();
     eloChart = new Chart(document.getElementById('eloPredictionChart').getContext('2d'), {
@@ -539,7 +550,11 @@ function renderAnalytics(recentForm, currentElo, matches) {
                 },
                 borderWidth: 2,
                 pointBackgroundColor: pointColors,
-                pointRadius: ctx => ctx.dataIndex === validMatches ? 6 : 0,
+                pointRadius: ctx => {
+                    if (ctx.dataIndex === validMatches + futureSteps - 1) return 6; 
+                    if (ctx.dataIndex >= validMatches) return 3; 
+                    return 0; 
+                },
                 pointHoverRadius: 6,
                 fill: false,
                 tension: 0.1
@@ -556,6 +571,49 @@ function renderAnalytics(recentForm, currentElo, matches) {
                 } 
             },
             interaction: { mode: 'index', intersect: false }
+        }
+    });
+
+    let kdArray = matches.map(m => {
+        let k = parseInt(m.Kills) || 0;
+        let d = parseInt(m.Deaths) || 1;
+        return k / d;
+    });
+
+    let meanKD = kdArray.reduce((a, b) => a + b, 0) / validMatches;
+    let sumSquaredDiffs = kdArray.reduce((sum, kd) => sum + Math.pow(kd - meanKD, 2), 0);
+    let stdDev = Math.sqrt(sumSquaredDiffs / validMatches);
+
+    let stabilityScore = Math.max(0, 100 - (stdDev * 75)); 
+    let roundedScore = Math.round(stabilityScore);
+
+    let statusText = "Максимальна";
+    let gaugeColor = '#10b981'; 
+    if (roundedScore < 85) { statusText = "Висока"; gaugeColor = '#3b82f6'; } 
+    if (roundedScore < 70) { statusText = "Середня"; gaugeColor = '#f59e0b'; } 
+    if (roundedScore < 30) { statusText = "Низька"; gaugeColor = '#ef4444'; } 
+
+    document.getElementById('stabilityScoreText').textContent = roundedScore + "%";
+    document.getElementById('stabilityScoreText').style.color = gaugeColor;
+    document.getElementById('stabilityStatusText').textContent = statusText;
+
+    if (stabilityChart) stabilityChart.destroy();
+    stabilityChart = new Chart(document.getElementById('stabilityGaugeChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [roundedScore, 100 - roundedScore],
+                backgroundColor: [gaugeColor, '#27272a'],
+                borderWidth: 0,
+                circumference: 180,
+                rotation: 270
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: '80%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            layout: { padding: { bottom: 20 } }
         }
     });
 }
