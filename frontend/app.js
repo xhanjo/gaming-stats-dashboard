@@ -5,6 +5,8 @@ let weeklyChart = null;
 let rawMatchHistory = []; 
 let currentMatchHistory = []; 
 let trueKDVal = "0.00"; 
+let radarChart = null; 
+let eloChart = null;
 
 let displayedMatchesCount = 0;
 const MATCHES_PER_PAGE = 20;
@@ -300,6 +302,7 @@ async function searchPlayer(event, limit = 30, isDeepScan = false) {
             drawTrendChart(trendData);
             changeChart('kd');
 
+            renderAnalytics(data.recent_form, elo, rawMatchHistory);
             renderPlayActivity(rawMatchHistory);
             renderMatchTable(true); 
         }
@@ -408,6 +411,153 @@ function renderMatchTable(reset = false) {
 
 function loadMoreMatches() {
     renderMatchTable(false);
+}
+
+function renderAnalytics(recentForm, currentElo, matches) {
+    let tSniper = 0, tEntry = 0, tAssists = 0, tADR = 0, tHS = 0, tMulti = 0;
+    let validMatches = matches.length || 1;
+    
+    matches.forEach(m => {
+        tSniper += parseInt(m['Sniper Kills'] || m.SniperKills) || 0;
+        tEntry += parseInt(m['First Kills'] || m.FirstKills) || 0;
+        tAssists += parseInt(m.Assists) || 0;
+        tADR += parseFloat(m.ADR) || 0;
+        tHS += parseFloat(m['Headshots %'] || m.HeadshotsPc) || 0;
+        
+        let triples = parseInt(m['Triple Kills'] || m.TripleKills) || 0;
+        let quadros = parseInt(m['Quadro Kills'] || m.QuadroKills) || 0;
+        let pentas = parseInt(m['Penta Kills'] || m.PentaKills) || 0;
+        tMulti += (triples + quadros + pentas);
+    });
+
+    let avgSniper = tSniper / validMatches;
+    let avgEntry = tEntry / validMatches;
+    let avgAssists = tAssists / validMatches;
+    let avgADR = tADR / validMatches;
+    let avgHS = tHS / validMatches;
+    let avgMulti = tMulti / validMatches;
+
+    let role = "Flex";
+    if (avgSniper >= 6.0) role = "Main AWPer";
+    else if (avgEntry >= 2.5 && avgADR >= 85.0) role = "Entry Fragger";
+    else if (avgMulti >= 0.8 && avgADR >= 80.0) role = "Anchor";
+    else if (avgHS >= 50.0 && avgADR >= 85.0) role = "Star Rifler";
+    else if (avgAssists >= 4.5) role = "Support";
+
+    document.getElementById('playstyleRoleText').textContent = role;
+
+    let nSniper = Math.min(((avgSniper) / 8) * 100, 100); 
+    let nEntry = Math.min(((avgEntry) / 3.5) * 100, 100);
+    let nAssists = Math.min(((avgAssists) / 6) * 100, 100);
+    let nADR = Math.min(((avgADR) / 105) * 100, 100);
+    let nHS = Math.min(((avgHS) / 60) * 100, 100); 
+    let nMulti = Math.min(((avgMulti) / 1.2) * 100, 100); 
+
+    if (radarChart) radarChart.destroy();
+    radarChart = new Chart(document.getElementById('playstyleRadarChart').getContext('2d'), {
+        type: 'radar',
+        data: {
+            labels: ['Снайпер', 'Ентрі', 'Сапорт', 'Опорник (Multi)', 'Точність (HS%)', 'Вогнева міць'],
+            datasets: [{
+                data: [nSniper, nEntry, nAssists, nMulti, nHS, nADR],
+                backgroundColor: 'rgba(99, 102, 241, 0.25)',
+                borderColor: '#6366f1',
+                pointBackgroundColor: '#6366f1',
+                pointBorderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: { 
+                r: { 
+                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' }, 
+                    grid: { color: 'rgba(255, 255, 255, 0.1)' }, 
+                    pointLabels: { color: '#a1a1aa', font: { size: 11, weight: 'bold' } }, 
+                    ticks: { display: false, min: 0, max: 100, stepSize: 20 }
+                } 
+            },
+            plugins: { legend: { display: false }, tooltip: { enabled: false } }
+        }
+    });
+
+    let eloHistory = new Array(validMatches);
+    let tempElo = currentElo;
+    for (let i = 0; i < validMatches; i++) {
+        eloHistory[validMatches - 1 - i] = tempElo;
+        const res = matches[i].Result || matches[i].win || "0";
+        if (res.toString() === "1" || res.toString() === "true") {
+            tempElo -= 25; 
+        } else {
+            tempElo += 25; 
+        }
+    }
+
+    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+    let n = validMatches;
+    for(let i = 0; i < n; i++) {
+        let x = i + 1;
+        let y = eloHistory[i];
+        sumX += x;
+        sumY += y;
+        sumXY += x * y;
+        sumX2 += x * x;
+    }
+    
+    let m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+    let b = (sumY - m * sumX) / n;
+    
+    let predictedElo = Math.round(m * (n + 1) + b);
+    let trendVal = m;
+
+    document.getElementById('predictedEloText').textContent = predictedElo || currentElo || "-";
+    
+    let trendEl = document.getElementById('eloTrendText');
+    if (trendVal > 0.5) {
+        trendEl.innerHTML = `<span class="text-green-500">↑ +${trendVal.toFixed(1)} за матч</span>`;
+    } else if (trendVal < -0.5) {
+        trendEl.innerHTML = `<span class="text-red-500">↓ ${Math.abs(trendVal).toFixed(1)} за матч</span>`;
+    } else {
+        trendEl.innerHTML = `<span class="text-gray-400">Стабільно</span>`;
+    }
+
+    let labels = Array.from({length: validMatches + 1}, (_, i) => i === validMatches ? 'Прогноз' : i + 1);
+    let dataPoints = [...eloHistory, predictedElo];
+    let pointColors = Array(validMatches).fill('#ff5500');
+    pointColors.push('#10b981'); 
+
+    if (eloChart) eloChart.destroy();
+    eloChart = new Chart(document.getElementById('eloPredictionChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: dataPoints,
+                segment: {
+                    borderDash: ctx => ctx.p0DataIndex >= validMatches - 1 ? [5, 5] : undefined,
+                    borderColor: ctx => ctx.p0DataIndex >= validMatches - 1 ? '#10b981' : '#ff5500',
+                },
+                borderWidth: 2,
+                pointBackgroundColor: pointColors,
+                pointRadius: ctx => ctx.dataIndex === validMatches ? 6 : 0,
+                pointHoverRadius: 6,
+                fill: false,
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: { 
+                x: { display: false }, 
+                y: { 
+                    grid: { color: '#27272a' }, 
+                    ticks: { color: '#71717a', precision: 0 } 
+                } 
+            },
+            interaction: { mode: 'index', intersect: false }
+        }
+    });
 }
 
 function renderPlayActivity(matches) {

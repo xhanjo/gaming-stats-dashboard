@@ -69,7 +69,14 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Не вдалося отримати загальну статистику: %v", err)
 		}
 
-		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit)
+		// 🔥 Отримуємо поточне Elo гравця, щоб передати його для прогнозування
+		currentElo := 0
+		if cs2Info, ok := profile.Games["cs2"]; ok {
+			currentElo = cs2Info.FaceitElo
+		}
+
+		// 🔥 Передаємо currentElo останнім параметром
+		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit, currentElo)
 		if err == nil {
 			profile.Recent = recentForm
 			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)

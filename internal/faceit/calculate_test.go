@@ -45,7 +45,8 @@ func TestCalculateRecentForm_TableDriven(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			result := CalculateStatsFromHistory(tt.inputHistory)
+			// 🔥 ВИПРАВЛЕННЯ: Передаємо 2000 як фейкове поточне Elo для проходження тесту
+			result := CalculateStatsFromHistory(tt.inputHistory, 2000)
 
 			if tt.expectNil {
 				if result != nil {

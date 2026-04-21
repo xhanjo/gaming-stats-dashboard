@@ -105,6 +105,9 @@ type RecentForm struct {
 	AvgKRRatio       float64            `json:"avg_kr_ratio"`
 	TotalEntryKills  int                `json:"total_entry_kills"`
 	TotalSniperKills int                `json:"total_sniper_kills"`
+	PlaystyleRole    string             `json:"playstyle_role"`
+	PredictedElo     int                `json:"predicted_elo"`
+	EloTrend         float64            `json:"elo_trend"`
 	MatchHistory     []PlayerMatchStats `json:"match_history"`
 }
 
@@ -258,13 +261,74 @@ func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey
 	return nil, fmt.Errorf("гравця %s не знайдено в матчі %s", targetPlayerID, matchID)
 }
 
-func CalculateStatsFromHistory(formHistory []PlayerMatchStats) *RecentForm {
+func DeterminePlaystyle(avgSniper, avgEntry, avgAssists, avgADR, avgHS, avgMulti float64) string {
+	if avgSniper >= 6.0 {
+		return "Main AWPer"
+	}
+	if avgEntry >= 2.5 && avgADR >= 85.0 {
+		return "Entry Fragger"
+	}
+	if avgMulti >= 0.8 && avgADR >= 80.0 {
+		return "Anchor"
+	}
+	if avgHS >= 50.0 && avgADR >= 85.0 {
+		return "Star Rifler"
+	}
+	if avgAssists >= 4.5 {
+		return "Support"
+	}
+	return "Flex"
+}
+
+func CalculateEloRegression(currentElo int, matches []PlayerMatchStats) (float64, int) {
+	if len(matches) == 0 {
+		return 0, currentElo
+	}
+
+	n := len(matches)
+	eloHistory := make([]int, n)
+	current := currentElo
+
+	for i := 0; i < n; i++ {
+		eloHistory[n-1-i] = current
+
+		res := matches[i].Result
+		isWin := res == "1" || res == "true"
+
+		if isWin {
+			current -= 25
+		} else {
+			current += 25
+		}
+	}
+
+	var sumX, sumY, sumXY, sumX2 float64
+	numPoints := float64(n)
+
+	for i, elo := range eloHistory {
+		x := float64(i + 1)
+		y := float64(elo)
+		sumX += x
+		sumY += y
+		sumXY += x * y
+		sumX2 += x * x
+	}
+
+	m := (numPoints*sumXY - sumX*sumY) / (numPoints*sumX2 - sumX*sumX)
+	b := (sumY - m*sumX) / numPoints
+
+	predictedElo := m*(numPoints+1) + b
+
+	return m, int(predictedElo)
+}
+
+func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *RecentForm {
 	if len(formHistory) == 0 {
 		return nil
 	}
 
-	var totalKills, totalADR, totalHS, totalKR float64
-	var totalEntry, totalSniper int
+	var totalKills, totalADR, totalHS, totalKR, totalAssists float64
+	var totalEntry, totalSniper, totalMulti int
 	var successfulMatches = len(formHistory)
 
 	for _, stats := range formHistory {
@@ -280,27 +344,50 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats) *RecentForm {
 		if val, err := strconv.ParseFloat(stats.KRRatio, 64); err == nil {
 			totalKR += val
 		}
+		if val, err := strconv.ParseFloat(stats.Assists, 64); err == nil {
+			totalAssists += val
+		}
 		if val, err := strconv.Atoi(stats.FirstKills); err == nil {
 			totalEntry += val
 		}
 		if val, err := strconv.Atoi(stats.SniperKills); err == nil {
 			totalSniper += val
 		}
+
+		// Рахуємо мультикіли для Опорника
+		triples, _ := strconv.Atoi(stats.TripleKills)
+		quadros, _ := strconv.Atoi(stats.QuadroKills)
+		pentas, _ := strconv.Atoi(stats.PentaKills)
+		totalMulti += (triples + quadros + pentas)
 	}
+
+	avgSniper := float64(totalSniper) / float64(successfulMatches)
+	avgEntry := float64(totalEntry) / float64(successfulMatches)
+	avgAssists := totalAssists / float64(successfulMatches)
+	avgADR := totalADR / float64(successfulMatches)
+	avgHS := totalHS / float64(successfulMatches)
+	avgMulti := float64(totalMulti) / float64(successfulMatches)
+
+	role := DeterminePlaystyle(avgSniper, avgEntry, avgAssists, avgADR, avgHS, avgMulti)
+
+	trendM, predictedElo := CalculateEloRegression(currentElo, formHistory)
 
 	return &RecentForm{
 		MatchesAnalyzed:  successfulMatches,
 		AvgKills:         totalKills / float64(successfulMatches),
-		AvgADR:           totalADR / float64(successfulMatches),
-		AvgHSPercentage:  totalHS / float64(successfulMatches),
+		AvgADR:           avgADR,
+		AvgHSPercentage:  avgHS,
 		AvgKRRatio:       totalKR / float64(successfulMatches),
 		TotalEntryKills:  totalEntry,
 		TotalSniperKills: totalSniper,
+		PlaystyleRole:    role,
+		PredictedElo:     predictedElo,
+		EloTrend:         trendM,
 		MatchHistory:     formHistory,
 	}
 }
 
-func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int) (*RecentForm, error) {
+func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int, currentElo int) (*RecentForm, error) {
 	matchItems, err := GetPlayerMatchHistory(ctx, playerID, apiKey, limit)
 	if err != nil {
 		return nil, err
@@ -373,5 +460,5 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 		return nil, fmt.Errorf("не вдалося проаналізувати жодного матчу")
 	}
 
-	return CalculateStatsFromHistory(formHistory), nil
+	return CalculateStatsFromHistory(formHistory, currentElo), nil
 }
