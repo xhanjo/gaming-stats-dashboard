@@ -8,6 +8,7 @@ let trueKDVal = "0.00";
 let radarChart = null; 
 let eloChart = null;
 let stabilityChart = null;
+let clusterChartInstance = null;
 
 let displayedMatchesCount = 0;
 const MATCHES_PER_PAGE = 20;
@@ -98,6 +99,7 @@ function resetUI() {
     if (trendChart) { trendChart.destroy(); trendChart = null; }
     if (dailyChart) { dailyChart.destroy(); dailyChart = null; }
     if (weeklyChart) { weeklyChart.destroy(); weeklyChart = null; }
+    if (clusterChartInstance) { clusterChartInstance.destroy(); clusterChartInstance = null; }
 }
 
 function toggleLoading(isLoading) {
@@ -367,8 +369,11 @@ function renderMatchTable(reset = false) {
         let dateStr = "-";
         if (rawTime) {
             let ts = rawTime;
-            if (typeof ts === 'number' && ts < 10000000000) ts *= 1000;
-            let d = new Date(typeof ts === 'string' && isNaN(ts) ? ts.replace(' UTC', 'Z') : parseInt(ts));
+            if (typeof ts === 'number') ts = ts * (ts < 1e10 ? 1000 : 1);
+            else if (!isNaN(ts)) ts = parseInt(ts) * (parseInt(ts) < 1e10 ? 1000 : 1);
+            else ts = new Date(ts.replace(' UTC', 'Z')).getTime();
+            
+            let d = new Date(ts);
             if (!isNaN(d.getTime())) {
                 dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString('uk-UA', {hour: '2-digit', minute:'2-digit'});
             }
@@ -419,6 +424,135 @@ function renderMatchTable(reset = false) {
 
 function loadMoreMatches() {
     renderMatchTable(false);
+}
+
+function analyticsTooltipHandler(context, config) {
+    let tooltipEl = document.getElementById(config.id);
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = config.id;
+        tooltipEl.classList.add('absolute', 'z-50', 'pointer-events-none', 'transition-all', 'duration-150', 'w-64');
+        document.body.appendChild(tooltipEl);
+    }
+
+    const tooltipModel = context.tooltip;
+    if (tooltipModel.opacity === 0) { tooltipEl.style.opacity = 0; return; }
+
+    const dp = tooltipModel.dataPoints[0];
+    let mapName = 'unknown', safeMapName = 'unknown', dateStr = 'Невідома дата', score = '', isWin = false, metricsHtml = '';
+
+    if (config.type === 'cluster') {
+        let pt = dp.raw;
+        let m = pt.rawMatch;
+        
+        let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.created_at || m.updated_at || m["Created At"] || m["Updated At"];
+        if (rawTime) {
+            let ts = rawTime;
+            if (typeof ts === 'number') ts = ts * (ts < 1e10 ? 1000 : 1);
+            else if (!isNaN(ts)) ts = parseInt(ts) * (parseInt(ts) < 1e10 ? 1000 : 1);
+            else ts = new Date(ts.replace(' UTC', 'Z')).getTime();
+            
+            let d = new Date(ts);
+            if (!isNaN(d.getTime())) {
+                dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('uk-UA', {hour: '2-digit', minute:'2-digit'});
+            }
+        }
+        
+        mapName = m.map ? m.map.replace('de_', '') : 'unknown';
+        safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+        mapName = mapName.charAt(0).toUpperCase() + mapName.slice(1);
+        score = m.score ? m.score.replace(' / ', ':') : '-:-';
+        isWin = (m.Result === "1" || m.Win === "true" || m.win === "1");
+
+        metricsHtml = `
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D</span><span class="text-white font-bold text-[13px]">${pt.x.toFixed(2)}</span></div>
+            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">ADR</span><span class="text-white font-bold text-[13px]">${pt.y.toFixed(1)}</span></div>
+            <div class="flex justify-between mt-1"><span class="text-gray-500 uppercase font-bold text-[10px]">Кластер</span><span class="text-indigo-400 font-bold text-[13px]">${context.chart.data.datasets[dp.datasetIndex].label}</span></div>
+        `;
+    } else if (config.type === 'elo') {
+        let dataIndex = dp.dataIndex;
+        let validMatches = config.validMatches;
+        let matches = config.matches;
+
+        if (dataIndex >= validMatches) {
+            let step = dataIndex - validMatches + 1;
+            let prevElo = context.chart.data.datasets[dp.datasetIndex].data[dataIndex - 1];
+            let currentElo = dp.parsed.y;
+            let isWinStep = currentElo > prevElo;
+            let datasetLabel = context.chart.data.datasets[dp.datasetIndex].label;
+            
+            metricsHtml = `
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Сценарій</span><span class="text-white font-bold text-[13px]">${datasetLabel}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Зміна</span><span class="${isWinStep ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${isWinStep ? '+25 (WIN)' : '-25 (LOSS)'}</span></div>
+                <div class="flex justify-between mt-1"><span class="text-gray-500 uppercase font-bold text-[10px]">Прогноз Elo</span><span class="text-white font-bold text-[14px]">${currentElo}</span></div>
+            `;
+
+            tooltipEl.innerHTML = `
+                <div class="bg-[#18181b]/98 border border-faceit/50 rounded-xl shadow-2xl p-4 backdrop-blur-md">
+                    <div class="text-[11px] text-faceit font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2">🔮 Симуляція Монте-Карло: Матч +${step}</div>
+                    <div class="space-y-2 font-mono">${metricsHtml}</div>
+                </div>
+            `;
+        } else {
+            let m = matches[validMatches - 1 - dataIndex];
+            
+            let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.created_at || m.updated_at || m["Created At"] || m["Updated At"];
+            if (rawTime) {
+                let ts = rawTime;
+                if (typeof ts === 'number') ts = ts * (ts < 1e10 ? 1000 : 1);
+                else if (!isNaN(ts)) ts = parseInt(ts) * (parseInt(ts) < 1e10 ? 1000 : 1);
+                else ts = new Date(ts.replace(' UTC', 'Z')).getTime();
+                
+                let d = new Date(ts);
+                if (!isNaN(d.getTime())) {
+                    dateStr = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short', year: 'numeric' }) + ', ' + d.toLocaleTimeString('uk-UA', {hour: '2-digit', minute:'2-digit'});
+                }
+            }
+
+            mapName = m.map ? m.map.replace('de_', '') : 'unknown';
+            safeMapName = mapName.toLowerCase().replace(/\s+/g, '');
+            mapName = mapName.charAt(0).toUpperCase() + mapName.slice(1);
+            score = m.score ? m.score.replace(' / ', ':') : '-:-';
+            isWin = (m.Result === "1" || m.Win === "true" || m.win === "1");
+            let kd = (parseInt(m.Kills) / (parseInt(m.Deaths)||1)).toFixed(2);
+
+            metricsHtml = `
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Elo після гри</span><span class="text-white font-bold text-[13px]">${dp.parsed.y}</span></div>
+                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D у матчі</span><span class="${kd >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${kd}</span></div>
+            `;
+        }
+    }
+
+    if ((config.type === 'cluster') || (config.type === 'elo' && dp.dataIndex < config.validMatches)) {
+        tooltipEl.innerHTML = `
+            <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
+                <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    ${dateStr}
+                </div>
+                <div class="flex justify-between items-center mb-3">
+                    <div class="flex items-center gap-3">
+                        <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-8 h-8 object-contain drop-shadow-md">
+                        <span class="text-sm font-bold text-white capitalize">${mapName}</span>
+                    </div>
+                    <span class="text-xs font-black ${isWin ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'} px-2 py-1 rounded border ${isWin ? 'border-green-500/20' : 'border-red-500/20'}">
+                        ${isWin ? 'W' : 'L'} ${score}
+                    </span>
+                </div>
+                <div class="space-y-2 font-mono">${metricsHtml}</div>
+            </div>
+        `;
+    }
+
+    const position = context.chart.canvas.getBoundingClientRect();
+    const chartWidth = context.chart.width;
+    let leftPos = (tooltipModel.caretX > chartWidth * 0.5) 
+        ? position.left + window.scrollX + tooltipModel.caretX - tooltipEl.offsetWidth - 25
+        : position.left + window.scrollX + tooltipModel.caretX + 25;
+
+    tooltipEl.style.opacity = 1;
+    tooltipEl.style.left = leftPos + 'px';
+    tooltipEl.style.top = position.top + window.scrollY + 15 + (tooltipModel.caretY * 0.1) + 'px';
 }
 
 function renderAnalytics(recentForm, currentElo, matches) {
@@ -511,7 +645,7 @@ function renderAnalytics(recentForm, currentElo, matches) {
             plugins: { 
                 legend: { display: false }, 
                 tooltip: { 
-                    enabled: true, 
+                    enabled: true,
                     backgroundColor: 'rgba(24, 24, 27, 0.95)',
                     titleColor: '#a1a1aa',
                     bodyColor: '#ffffff',
@@ -520,25 +654,169 @@ function renderAnalytics(recentForm, currentElo, matches) {
                     padding: 10,
                     displayColors: false,
                     callbacks: {
-                        label: function(context) {
-                            return context.dataset.rawStats[context.dataIndex]; // Показуємо реальну цифру!
-                        }
+                        label: function(context) { return context.dataset.rawStats[context.dataIndex]; }
                     }
                 } 
             }
         }
     });
 
-    let futureSteps = 10;
+    let kdArray = matches.map(m => {
+        let k = parseInt(m.Kills) || 0;
+        let d = parseInt(m.Deaths) || 1;
+        return k / d;
+    });
+
+    let meanKD = kdArray.reduce((a, b) => a + b, 0) / validMatches;
+    let sumSquaredDiffs = kdArray.reduce((sum, kd) => sum + Math.pow(kd - meanKD, 2), 0);
+    let kdStdDev = Math.sqrt(sumSquaredDiffs / validMatches);
+
+    let stabilityScore = Math.max(0, 100 - (kdStdDev * 75)); 
+    let roundedScore = Math.round(stabilityScore);
+
+    let statusText = "Максимальна";
+    let gaugeColor = '#10b981'; 
+    if (roundedScore < 85) { statusText = "Висока"; gaugeColor = '#3b82f6'; } 
+    if (roundedScore < 70) { statusText = "Середня"; gaugeColor = '#f59e0b'; } 
+    if (roundedScore < 30) { statusText = "Низька"; gaugeColor = '#ef4444'; } 
+
+    document.getElementById('stabilityScoreText').textContent = roundedScore + "%";
+    document.getElementById('stabilityScoreText').style.color = gaugeColor;
+    document.getElementById('stabilityStatusText').textContent = statusText;
+
+    if (stabilityChart) stabilityChart.destroy();
+    stabilityChart = new Chart(document.getElementById('stabilityGaugeChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            datasets: [{
+                data: [roundedScore, 100 - roundedScore],
+                backgroundColor: [gaugeColor, '#27272a'],
+                borderWidth: 0,
+                circumference: 180,
+                rotation: 270
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            cutout: '80%',
+            plugins: { legend: { display: false }, tooltip: { enabled: false } },
+            layout: { padding: { bottom: 20 } }
+        }
+    });
+
+    let clusterData = matches.map(m => {
+        let k = parseInt(m.Kills) || 0;
+        let d = parseInt(m.Deaths) || 1;
+        let adr = parseFloat(m.ADR) || 0;
+        return {
+            x: k / d,
+            y: adr,
+            rawMatch: m 
+        };
+    });
+
+    let centroids = [
+        { x: 0.5, y: 50 },  
+        { x: 1.0, y: 75 },  
+        { x: 1.5, y: 100 }  
+    ];
+
+    for (let iter = 0; iter < 10; iter++) {
+        let clusters = [[], [], []];
+        
+        clusterData.forEach(point => {
+            let distances = centroids.map(c => 
+                Math.pow((point.x - c.x) * 50, 2) + Math.pow(point.y - c.y, 2)
+            );
+            let minIndex = distances.indexOf(Math.min(...distances));
+            point.cluster = minIndex;
+            clusters[minIndex].push(point);
+        });
+
+        centroids = clusters.map((cluster, i) => {
+            if (cluster.length === 0) return centroids[i];
+            let sumX = cluster.reduce((sum, p) => sum + p.x, 0);
+            let sumY = cluster.reduce((sum, p) => sum + p.y, 0);
+            return { x: sumX / cluster.length, y: sumY / cluster.length };
+        });
+    }
+
+    centroids.forEach((c, i) => c.originalIndex = i);
+    centroids.sort((a, b) => (b.x * 50 + b.y) - (a.x * 50 + a.y));
     
+    let starClusterId = centroids[0].originalIndex;
+    let midClusterId = centroids[1].originalIndex;
+    let lowClusterId = centroids[2].originalIndex;
+
+    let starPts = clusterData.filter(p => p.cluster === starClusterId);
+    let midPts = clusterData.filter(p => p.cluster === midClusterId);
+    let lowPts = clusterData.filter(p => p.cluster === lowClusterId);
+
+    let starPct = Math.round((starPts.length / validMatches) * 100);
+    let midPct = Math.round((midPts.length / validMatches) * 100);
+    let lowPct = Math.round((lowPts.length / validMatches) * 100);
+
+    document.getElementById('clusterSummaryText').innerHTML = 
+        `<span class="text-green-400 font-bold">${starPct}% Зірка</span> • 
+         <span class="text-yellow-500 font-bold">${midPct}% База</span> • 
+         <span class="text-red-400 font-bold">${lowPct}% Спади</span>`;
+
+    if (clusterChartInstance) clusterChartInstance.destroy();
+    clusterChartInstance = new Chart(document.getElementById('clusterChart').getContext('2d'), {
+        type: 'scatter',
+        data: {
+            datasets: [
+                {
+                    label: 'Зіркові матчі',
+                    data: starPts,
+                    backgroundColor: '#10b981', 
+                    borderColor: 'rgba(16, 185, 129, 0.5)',
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                },
+                {
+                    label: 'Стабільна база',
+                    data: midPts,
+                    backgroundColor: '#eab308', 
+                    borderColor: 'rgba(234, 179, 8, 0.5)',
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                },
+                {
+                    label: 'Важкі матчі',
+                    data: lowPts,
+                    backgroundColor: '#ef4444', 
+                    borderColor: 'rgba(239, 68, 68, 0.5)',
+                    pointRadius: 5,
+                    pointHoverRadius: 8
+                }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { title: { display: true, text: 'K/D Ratio', color: '#71717a' }, grid: { color: '#27272a' }, ticks: { color: '#71717a' } },
+                y: { title: { display: true, text: 'ADR', color: '#71717a' }, grid: { color: '#27272a' }, ticks: { color: '#71717a' } }
+            },
+            plugins: {
+                legend: { position: 'top', labels: { color: '#a1a1aa', boxWidth: 12 } },
+                tooltip: {
+                    enabled: false,
+                    external: (context) => analyticsTooltipHandler(context, { type: 'cluster', id: 'cluster-html-tooltip' })
+                }
+            }
+        }
+    });
+
+    let futureSteps = 10;
     let wr = recentWins / validMatches;
     wr = Math.max(0.2, Math.min(0.8, wr)); 
 
     let expWins = Math.round(futureSteps * wr);
-    let stdDev = Math.round(Math.sqrt(futureSteps * wr * (1 - wr)));
+    let mcStdDev = Math.round(Math.sqrt(futureSteps * wr * (1 - wr)));
     
-    let optWins = Math.min(futureSteps, expWins + stdDev + 1);
-    let pesWins = Math.max(0, expWins - stdDev - 1);
+    let optWins = Math.min(futureSteps, expWins + mcStdDev + 1);
+    let pesWins = Math.max(0, expWins - mcStdDev - 1);
 
     function generateRealisticPath(startElo, winsCount) {
         let lossesCount = futureSteps - winsCount;
@@ -636,37 +914,8 @@ function renderAnalytics(recentForm, currentElo, matches) {
             plugins: { 
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(24, 24, 27, 0.95)',
-                    titleColor: '#a1a1aa', bodyColor: '#ffffff', borderColor: '#ff5500', borderWidth: 1, padding: 12, displayColors: false,
-                    callbacks: {
-                        title: function(context) {
-                            let idx = context[0].dataIndex;
-                            if (idx >= validMatches) return 'Симуляція: Матч +' + (idx - validMatches + 1);
-                            let match = matches[validMatches - 1 - idx];
-                            if (!match) return 'Матч ' + (idx + 1);
-                            let mapName = match.map ? match.map.replace('de_', '') : 'Unknown';
-                            mapName = mapName.charAt(0).toUpperCase() + mapName.slice(1);
-                            let score = match.score ? match.score.replace(' / ', ':') : '';
-                            let isWin = (match.Result === "1" || match.Win === "true" || match.win === "1");
-                            return `${isWin ? 'WIN' : 'LOSS'} ${score} | ${mapName}`;
-                        },
-                        label: function(context) {
-                            let idx = context.dataIndex;
-                            if (idx >= validMatches) {
-                                let prevElo = context.dataset.data[idx - 1];
-                                let isWinStep = context.parsed.y > prevElo;
-                                let resTxt = isWinStep ? '+25 (WIN)' : '-25 (LOSS)';
-                                
-                                if (context.datasetIndex === 1) return `Вдала серія: ${context.parsed.y} Elo [${resTxt}]`;
-                                if (context.datasetIndex === 2) return `Погана серія: ${context.parsed.y} Elo [${resTxt}]`;
-                                return `Очікувано: ${context.parsed.y} Elo [${resTxt}]`;
-                            }
-                            if (context.datasetIndex !== 0) return null; 
-                            let match = matches[validMatches - 1 - idx];
-                            let kd = match ? (parseInt(match.Kills) / (parseInt(match.Deaths) || 1)).toFixed(2) : '-';
-                            return ['Elo: ' + context.parsed.y, 'K/D: ' + kd];
-                        }
-                    }
+                    enabled: false,
+                    external: (context) => analyticsTooltipHandler(context, { type: 'elo', id: 'elo-html-tooltip', validMatches: validMatches, matches: matches })
                 }
             },
             scales: { x: { display: false }, y: { grid: { color: '#27272a' }, ticks: { color: '#71717a', precision: 0 } } },
@@ -674,48 +923,6 @@ function renderAnalytics(recentForm, currentElo, matches) {
         }
     });
 
-    let kdArray = matches.map(m => {
-        let k = parseInt(m.Kills) || 0;
-        let d = parseInt(m.Deaths) || 1;
-        return k / d;
-    });
-
-    let meanKD = kdArray.reduce((a, b) => a + b, 0) / validMatches;
-    let sumSquaredDiffs = kdArray.reduce((sum, kd) => sum + Math.pow(kd - meanKD, 2), 0);
-    let kdStdDev = Math.sqrt(sumSquaredDiffs / validMatches);
-
-    let stabilityScore = Math.max(0, 100 - (kdStdDev * 75)); 
-    let roundedScore = Math.round(stabilityScore);
-
-    let statusText = "Максимальна";
-    let gaugeColor = '#10b981'; 
-    if (roundedScore < 85) { statusText = "Висока"; gaugeColor = '#3b82f6'; } 
-    if (roundedScore < 70) { statusText = "Середня"; gaugeColor = '#f59e0b'; } 
-    if (roundedScore < 30) { statusText = "Низька"; gaugeColor = '#ef4444'; } 
-
-    document.getElementById('stabilityScoreText').textContent = roundedScore + "%";
-    document.getElementById('stabilityScoreText').style.color = gaugeColor;
-    document.getElementById('stabilityStatusText').textContent = statusText;
-
-    if (stabilityChart) stabilityChart.destroy();
-    stabilityChart = new Chart(document.getElementById('stabilityGaugeChart').getContext('2d'), {
-        type: 'doughnut',
-        data: {
-            datasets: [{
-                data: [roundedScore, 100 - roundedScore],
-                backgroundColor: [gaugeColor, '#27272a'],
-                borderWidth: 0,
-                circumference: 180,
-                rotation: 270
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            cutout: '80%',
-            plugins: { legend: { display: false }, tooltip: { enabled: false } },
-            layout: { padding: { bottom: 20 } }
-        }
-    });
 }
 
 function renderPlayActivity(matches) {
@@ -960,8 +1167,11 @@ function universalTooltipHandler(context, config = { color: 'gray', id: 'main-to
     let dateStr = "Невідома дата";
     if (rawTime) {
         let ts = rawTime;
-        if (typeof ts === 'number' && ts < 10000000000) ts *= 1000;
-        let d = new Date(typeof ts === 'string' && isNaN(ts) ? ts.replace(' UTC', 'Z') : parseInt(ts));
+        if (typeof ts === 'number') ts = ts * (ts < 1e10 ? 1000 : 1);
+        else if (!isNaN(ts)) ts = parseInt(ts) * (parseInt(ts) < 1e10 ? 1000 : 1);
+        else ts = new Date(ts.replace(' UTC', 'Z')).getTime();
+        
+        let d = new Date(ts);
         if (!isNaN(d.getTime())) {
             const datePart = d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }).replace(' р.', '');
             const timePart = d.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' });
@@ -996,7 +1206,7 @@ function universalTooltipHandler(context, config = { color: 'gray', id: 'main-to
             <div class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 italic">${dateStr}</div>
             <div class="flex justify-between items-center mb-3">
                 <div class="flex items-center gap-3">
-                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-7 h-7 object-contain">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-7 h-7 object-contain drop-shadow-md">
                     <span class="text-sm font-bold text-white capitalize">${mapName}</span>
                 </div>
                 <span class="text-xs font-black text-white ${config.color === 'indigo' ? 'bg-indigo-500/20 border-indigo-500/30' : 'bg-black/40 border-gray-800'} px-2 py-1 rounded border">
@@ -1010,12 +1220,12 @@ function universalTooltipHandler(context, config = { color: 'gray', id: 'main-to
     const position = context.chart.canvas.getBoundingClientRect();
     const chartWidth = context.chart.width;
     let leftPos = (tooltipModel.caretX > chartWidth * 0.5) 
-        ? position.left + window.pageXOffset + tooltipModel.caretX - tooltipEl.offsetWidth - 25
-        : position.left + window.pageXOffset + tooltipModel.caretX + 25;
+        ? position.left + window.scrollX + tooltipModel.caretX - tooltipEl.offsetWidth - 25
+        : position.left + window.scrollX + tooltipModel.caretX + 25;
 
     tooltipEl.style.opacity = 1;
     tooltipEl.style.left = leftPos + 'px';
-    tooltipEl.style.top = position.top + window.pageYOffset + 15 + (tooltipModel.caretY * 0.1) + 'px';
+    tooltipEl.style.top = position.top + window.scrollY + 15 + (tooltipModel.caretY * 0.1) + 'px';
 }
 
 function changeChart(metric) {

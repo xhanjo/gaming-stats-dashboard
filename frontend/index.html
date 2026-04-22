@@ -445,9 +445,24 @@
             <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
               <div class="flex justify-between items-start mb-6">
                 <div>
+                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Кластеризація Імпакту (K-Means)</h3>
+                  <div id="clusterSummaryText" class="text-sm text-gray-400 mt-2">Аналізуємо патерни...</div>
+                </div>
+                <div class="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                </div>
+              </div>
+              <div class="flex-grow w-full min-h-[300px]">
+                <canvas id="clusterChart"></canvas>
+              </div>
+            </div>
+
+            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
+              <div class="flex justify-between items-start mb-6">
+                <div>
                   <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Прогноз Elo</h3>
                   <div class="flex items-center gap-3">
-                    <div id="predictedEloText" class="text-3xl font-bold text-white">0</div>
+                    <div id="predictedEloText" class="text-3xl font-bold text-white flex items-center gap-2">0</div>
                     <div id="eloTrendText" class="text-sm font-bold bg-gray-800 px-2 py-1 rounded">-</div>
                   </div>
                 </div>
