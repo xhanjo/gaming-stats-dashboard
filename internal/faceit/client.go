@@ -169,11 +169,11 @@ func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error
 
 func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
 	var allItems []MatchHistoryItem
-	batchSize := 20
+	batchSize := 100
 
 	for offset := 0; offset < limit; offset += batchSize {
 		if offset > 0 {
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(200 * time.Millisecond)
 		}
 
 		fetchSize := batchSize
@@ -411,14 +411,14 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 	results := make(chan matchResult, len(matchItems))
 
 	var wg sync.WaitGroup
-	const numWorkers = 4
+	const numWorkers = 5
 
 	for w := 1; w <= numWorkers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				time.Sleep(50 * time.Millisecond)
+				time.Sleep(150 * time.Millisecond)
 
 				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)
 

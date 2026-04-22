@@ -210,7 +210,7 @@ export function renderClusterChart(starPts, midPts, lowPts) {
                     pointHoverRadius: 8
                 },
                 {
-                    label: 'Average (Середня база)',
+                    label: 'Average (Середній імпакт)',
                     data: midPts,
                     backgroundColor: '#eab308', 
                     borderColor: 'rgba(234, 179, 8, 0.5)',
@@ -218,7 +218,7 @@ export function renderClusterChart(starPts, midPts, lowPts) {
                     pointHoverRadius: 8
                 },
                 {
-                    label: 'Low Impact (Спад форми)',
+                    label: 'Low Impact (Низький імпакт)',
                     data: lowPts,
                     backgroundColor: '#ef4444', 
                     borderColor: 'rgba(239, 68, 68, 0.5)',
@@ -351,29 +351,28 @@ function universalTooltipHandler(context, config = { color: 'gray', id: 'main-to
         const hsSuffix = hs !== '-' ? '%' : '';
         
         metricsHtml = `
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D/A</span><span class="text-white font-bold text-[13px]">${match.Kills}/${match.Deaths}/${match.Assists}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D</span><span class="${(match.Kills/match.Deaths) >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${(match.Kills/match.Deaths).toFixed(2)}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/R</span><span class="text-white font-bold text-[13px]">${kr}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">HS%</span><span class="text-white font-bold text-[13px]">${hs}${hsSuffix}</span></div>
+            <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">K/D/A</span><span class="text-white font-black text-base tracking-wide">${match.Kills}/${match.Deaths}/${match.Assists}</span></div>
+            <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">K/D</span><span class="${(match.Kills/match.Deaths) >= 1 ? 'text-green-400' : 'text-red-400'} font-black text-base tracking-wide">${(match.Kills/match.Deaths).toFixed(2)}</span></div>
+            <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">K/R</span><span class="text-white font-black text-base tracking-wide">${kr}</span></div>
+            <div class="flex justify-between items-center"><span class="text-gray-500 uppercase font-bold text-xs">HS%</span><span class="text-white font-black text-base tracking-wide">${hs}${hsSuffix}</span></div>
         `;
     } else {
         const metricName = document.getElementById('panelMetricName').textContent;
-        metricsHtml = `<div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[11px]">${metricName}</span><span class="text-white font-bold text-[13px]">${tooltipModel.dataPoints[0].formattedValue}</span></div>`;
-    }
+        metricsHtml = `<div class="flex justify-between items-center"><span class="text-gray-500 uppercase font-bold text-xs">${metricName}</span><span class="text-white font-black text-base tracking-wide">${tooltipModel.dataPoints[0].formattedValue}</span></div>`;    }
 
     tooltipEl.innerHTML = `
         <div class="bg-[#18181b]/98 border ${config.color === 'indigo' ? 'border-indigo-500/50' : 'border-gray-700'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
-            <div class="text-[11px] text-gray-500 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 italic">${dateStr}</div>
-            <div class="flex justify-between items-center mb-3">
+            <div class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 italic">${dateStr}</div>
+            <div class="flex justify-between items-center mb-4">
                 <div class="flex items-center gap-3">
-                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-7 h-7 object-contain drop-shadow-md">
-                    <span class="text-sm font-bold text-white capitalize">${mapName}</span>
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-8 h-8 object-contain drop-shadow-md">
+                    <span class="text-base font-bold text-white capitalize">${mapName}</span>
                 </div>
-                <span class="text-xs font-black text-white ${config.color === 'indigo' ? 'bg-indigo-500/20 border-indigo-500/30' : 'bg-black/40 border-gray-800'} px-2 py-1 rounded border">
+                <span class="text-sm font-black text-white ${config.color === 'indigo' ? 'bg-indigo-500/20 border-indigo-500/30' : 'bg-black/40 border-gray-800'} px-2 py-1 rounded border">
                     ${isWin ? 'W' : 'L'} ${score}
                 </span>
             </div>
-            <div class="space-y-2 font-mono">${metricsHtml}</div>
+            <div class="space-y-1.5 font-mono">${metricsHtml}</div>
         </div>
     `;
 
@@ -407,7 +406,7 @@ function analyticsTooltipHandler(context, config) {
         let pt = dp.raw;
         let m = pt.rawMatch;
         
-        if (!m) return; // Запобіжник
+        if (!m) return; 
 
         let rawTime = m.CreatedAt1 || m.UpdatedAt1 || m.created_at || m.updated_at || m["Created At"] || m["Updated At"];
         if (rawTime) {
@@ -428,13 +427,16 @@ function analyticsTooltipHandler(context, config) {
         score = m.score ? m.score.replace(' / ', ':') : '-:-';
         isWin = (m.Result === "1" || m.Win === "true" || m.win === "1");
 
+        // 🔥 ТОЧКОВИЙ ФІКС: Зменшили розмір шрифту та товщину для довгої назви кластера 🔥
         metricsHtml = `
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D</span><span class="text-white font-bold text-[13px]">${pt.x.toFixed(2)}</span></div>
-            <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">ADR</span><span class="text-white font-bold text-[13px]">${pt.y.toFixed(1)}</span></div>
-            <div class="flex justify-between mt-1"><span class="text-gray-500 uppercase font-bold text-[10px]">Кластер</span><span class="text-indigo-400 font-bold text-[13px]">${context.chart.data.datasets[dp.datasetIndex].label}</span></div>
+            <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">K/D</span><span class="text-white font-black text-base tracking-wide">${pt.x.toFixed(2)}</span></div>
+            <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">ADR</span><span class="text-white font-black text-base tracking-wide">${pt.y.toFixed(1)}</span></div>
+            <div class="flex justify-between items-center mt-2 pt-2 border-t border-gray-800/50 gap-2">
+                <span class="text-gray-500 uppercase font-bold text-[10px] shrink-0">Кластер</span>
+                <span class="text-indigo-400 font-bold text-xs text-right leading-tight">${context.chart.data.datasets[dp.datasetIndex].label}</span>
+            </div>
         `;
 
-        // 🔥 ТУТ БУВ ЗГУБЛЕНИЙ РЯДОК 🔥
         tooltipEl.innerHTML = `
             <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
                 <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
@@ -472,24 +474,35 @@ function analyticsTooltipHandler(context, config) {
                 let changeTxt = isWinStep ? '+25 (WIN)' : '-25 (LOSS)';
 
                 return `
-                    <div class="flex justify-between items-center gap-2 mt-2 border-b border-gray-800/50 pb-1.5">
-                        <span class="text-gray-400 font-bold text-[10px] uppercase">${datasetLabel}</span>
+                    <div class="flex justify-between items-center gap-4 mt-3 border-b border-gray-800/50 pb-2">
+                        <span class="text-gray-400 font-bold text-xs uppercase tracking-wide">${datasetLabel}</span>
                         <div class="text-right">
-                            <span class="${colorClass} font-bold text-[15px] block leading-tight">${val} Elo</span>
-                            <span class="text-xs font-bold tracking-wide ${isWinStep ? 'text-green-400' : 'text-red-400'}">${changeTxt}</span>
+                            <span class="${colorClass} font-black text-lg block leading-tight tracking-wide">${val} Elo</span>
+                            <span class="text-sm font-bold tracking-wide ${isWinStep ? 'text-green-400' : 'text-red-400'} mt-0.5 block">${changeTxt}</span>
                         </div>
                     </div>`;
             }).join('');
 
             tooltipEl.innerHTML = `
                 <div class="bg-[#18181b]/98 border border-faceit/30 rounded-xl shadow-2xl p-4 backdrop-blur-md">
-                    <div class="text-[11px] text-faceit font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+                    <div class="text-xs text-faceit font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
                         Симуляція: Матч +${step}
                     </div>
                     <div class="space-y-1 font-mono">${metricsHtml}</div>
                 </div>
             `;
+
+            const position = context.chart.canvas.getBoundingClientRect();
+            const chartWidth = context.chart.width;
+            let leftPos = (tooltipModel.caretX > chartWidth * 0.5) 
+                ? position.left + window.scrollX + tooltipModel.caretX - tooltipEl.offsetWidth - 25
+                : position.left + window.scrollX + tooltipModel.caretX + 25;
+
+            tooltipEl.style.opacity = 1;
+            tooltipEl.style.left = leftPos + 'px';
+            tooltipEl.style.top = position.top + window.scrollY + 15 + (tooltipModel.caretY * 0.1) + 'px';
+            return;
         } else {
             let m = matches[validMatches - 1 - dataIndex];
             
@@ -514,30 +527,30 @@ function analyticsTooltipHandler(context, config) {
             let kd = (parseInt(m.Kills) / (parseInt(m.Deaths)||1)).toFixed(2);
 
             metricsHtml = `
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Elo після гри</span><span class="text-white font-bold text-[13px]">${dp.parsed.y}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D у матчі</span><span class="${kd >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${kd}</span></div>
-            `;
-            
-            tooltipEl.innerHTML = `
-                <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
-                    <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                        ${dateStr}
-                    </div>
-                    <div class="flex justify-between items-center mb-3">
-                        <div class="flex items-center gap-3">
-                            <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-8 h-8 object-contain drop-shadow-md">
-                            <span class="text-sm font-bold text-white capitalize">${mapName}</span>
-                        </div>
-                        <span class="text-xs font-black ${isWin ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'} px-2 py-1 rounded border ${isWin ? 'border-green-500/20' : 'border-red-500/20'}">
-                            ${isWin ? 'W' : 'L'} ${score}
-                        </span>
-                    </div>
-                    <div class="space-y-2 font-mono">${metricsHtml}</div>
-                </div>
+                <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">Elo після гри</span><span class="text-white font-black text-base tracking-wide">${dp.parsed.y}</span></div>
+                <div class="flex justify-between items-center"><span class="text-gray-500 uppercase font-bold text-xs">K/D у матчі</span><span class="${kd >= 1 ? 'text-green-400' : 'text-red-400'} font-black text-base tracking-wide">${kd}</span></div>
             `;
         }
     }
+
+    tooltipEl.innerHTML = `
+        <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
+            <div class="text-xs text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                ${dateStr}
+            </div>
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-8 h-8 object-contain drop-shadow-md">
+                    <span class="text-base font-bold text-white capitalize">${mapName}</span>
+                </div>
+                <span class="text-sm font-black ${isWin ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'} px-2 py-1 rounded border ${isWin ? 'border-green-500/20' : 'border-red-500/20'}">
+                    ${isWin ? 'W' : 'L'} ${score}
+                </span>
+            </div>
+            <div class="space-y-1.5 font-mono">${metricsHtml}</div>
+        </div>
+    `;
 
     const position = context.chart.canvas.getBoundingClientRect();
     const chartWidth = context.chart.width;

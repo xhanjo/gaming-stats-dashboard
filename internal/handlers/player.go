@@ -33,7 +33,7 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 
 		limitStr := r.URL.Query().Get("limit")
 		limit := 30
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
 			limit = l
 		}
 
@@ -57,8 +57,9 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 
 		profile, err = faceit.GetPlayerProfile(ctx, nickname, apiKey)
 		if err != nil {
+			log.Printf("CRITICAL: Помилка Faceit API: %v", err)
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"error": "Гравця не знайдено або помилка API"}`)
+			fmt.Fprintf(w, `{"error": "Гравця не знайдено або Faceit API заблокував запити (429)"}`)
 			return
 		}
 
