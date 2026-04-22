@@ -35,7 +35,14 @@ function switchTab(tabId) {
     }
 }
 
-function getSearchHistory() { return JSON.parse(localStorage.getItem('searchHistory') || '[]'); }
+function getSearchHistory() { 
+    try {
+        const h = JSON.parse(localStorage.getItem('searchHistory'));
+        return Array.isArray(h) ? h : [];
+    } catch (e) {
+        return [];
+    }
+}
 
 function addToHistory(nickname) {
     let history = getSearchHistory();
@@ -418,7 +425,11 @@ function renderAnalytics(recentForm, currentElo, matches) {
     let tSniper = 0, tEntry = 0, tAssists = 0, tADR = 0, tHS = 0, tMulti = 0;
     let validMatches = matches.length || 1;
     
-    matches.forEach(m => {
+    let eloHistory = new Array(validMatches);
+    let tempElo = currentElo;
+    let recentWins = 0;
+
+    matches.forEach((m, i) => {
         tSniper += parseInt(m['Sniper Kills'] || m.SniperKills) || 0;
         tEntry += parseInt(m['First Kills'] || m.FirstKills) || 0;
         tAssists += parseInt(m.Assists) || 0;
@@ -429,6 +440,15 @@ function renderAnalytics(recentForm, currentElo, matches) {
         let quadros = parseInt(m['Quadro Kills'] || m.QuadroKills) || 0;
         let pentas = parseInt(m['Penta Kills'] || m.PentaKills) || 0;
         tMulti += (triples + quadros + pentas);
+
+        eloHistory[validMatches - 1 - i] = tempElo;
+        const res = m.Result || m.win || "0";
+        if (res.toString() === "1" || res.toString() === "true") {
+            tempElo -= 25; 
+            recentWins++;
+        } else {
+            tempElo += 25; 
+        }
     });
 
     let avgSniper = tSniper / validMatches;
@@ -453,6 +473,15 @@ function renderAnalytics(recentForm, currentElo, matches) {
     let nADR = Math.min(((avgADR) / 105) * 100, 100);
     let nHS = Math.min(((avgHS) / 60) * 100, 100); 
     let nMulti = Math.min(((avgMulti) / 1.2) * 100, 100); 
+    
+    let rawRadarStats = [
+        `${avgSniper.toFixed(2)} AWP кілів / матч`,
+        `${avgEntry.toFixed(2)} First kills / матч`,
+        `${avgAssists.toFixed(2)} Асистів / матч`,
+        `${avgMulti.toFixed(2)} Мультикілів (3k+) / матч`,
+        `${avgHS.toFixed(1)}% Headshots (в сер.)`,
+        `${avgADR.toFixed(1)} ADR (в сер.)`
+    ];
 
     if (radarChart) radarChart.destroy();
     radarChart = new Chart(document.getElementById('playstyleRadarChart').getContext('2d'), {
@@ -461,6 +490,7 @@ function renderAnalytics(recentForm, currentElo, matches) {
             labels: ['Снайпер', 'Ентрі', 'Сапорт', 'Опорник (Multi)', 'Точність (HS%)', 'Вогнева міць'],
             datasets: [{
                 data: [nSniper, nEntry, nAssists, nMulti, nHS, nADR],
+                rawStats: rawRadarStats,
                 backgroundColor: 'rgba(99, 102, 241, 0.25)',
                 borderColor: '#6366f1',
                 pointBackgroundColor: '#6366f1',
@@ -478,98 +508,168 @@ function renderAnalytics(recentForm, currentElo, matches) {
                     ticks: { display: false, min: 0, max: 100, stepSize: 20 }
                 } 
             },
-            plugins: { legend: { display: false }, tooltip: { enabled: false } }
+            plugins: { 
+                legend: { display: false }, 
+                tooltip: { 
+                    enabled: true, 
+                    backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                    titleColor: '#a1a1aa',
+                    bodyColor: '#ffffff',
+                    borderColor: '#6366f1',
+                    borderWidth: 1,
+                    padding: 10,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.rawStats[context.dataIndex]; // Показуємо реальну цифру!
+                        }
+                    }
+                } 
+            }
         }
     });
 
-    let eloHistory = new Array(validMatches);
-    let tempElo = currentElo;
-    for (let i = 0; i < validMatches; i++) {
-        eloHistory[validMatches - 1 - i] = tempElo;
-        const res = matches[i].Result || matches[i].win || "0";
-        if (res.toString() === "1" || res.toString() === "true") {
-            tempElo -= 25; 
-        } else {
-            tempElo += 25; 
+    let futureSteps = 10;
+    
+    let wr = recentWins / validMatches;
+    wr = Math.max(0.2, Math.min(0.8, wr)); 
+
+    let expWins = Math.round(futureSteps * wr);
+    let stdDev = Math.round(Math.sqrt(futureSteps * wr * (1 - wr)));
+    
+    let optWins = Math.min(futureSteps, expWins + stdDev + 1);
+    let pesWins = Math.max(0, expWins - stdDev - 1);
+
+    function generateRealisticPath(startElo, winsCount) {
+        let lossesCount = futureSteps - winsCount;
+        let steps = Array(winsCount).fill(25).concat(Array(lossesCount).fill(-25));
+        
+        for (let i = steps.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [steps[i], steps[j]] = [steps[j], steps[i]];
         }
+        
+        let path = [];
+        let current = startElo;
+        for(let step of steps) {
+            current += step;
+            path.push(current);
+        }
+        return path;
     }
 
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    let n = validMatches;
-    for(let i = 0; i < n; i++) {
-        let x = i + 1;
-        let y = eloHistory[i];
-        sumX += x;
-        sumY += y;
-        sumXY += x * y;
-        sumX2 += x * x;
-    }
-    
-    let m = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-    let b = (sumY - m * sumX) / n;
-    
-    let futureSteps = 5;
-    let futureEloArray = [];
-    let futureLabels = [];
-    let futureColors = [];
+    let expectedArray = generateRealisticPath(currentElo, expWins);
+    let optimisticArray = generateRealisticPath(currentElo, optWins);
+    let pessimisticArray = generateRealisticPath(currentElo, pesWins);
+    let futureLabels = Array.from({length: futureSteps}, (_, i) => '+' + (i + 1));
 
-    for (let i = 1; i <= futureSteps; i++) {
-        futureEloArray.push(Math.round(m * (n + i) + b));
-        futureLabels.push(i === futureSteps ? 'Прогноз' : `+${i}`);
-        futureColors.push('#10b981'); 
-    }
+    let finalExpected = expectedArray[futureSteps - 1];
+    let finalOpt = optimisticArray[futureSteps - 1];
+    let finalPes = pessimisticArray[futureSteps - 1];
 
-    let finalPredictedElo = futureEloArray[futureSteps - 1]; 
-    let trendVal = m;
-
-    document.getElementById('predictedEloText').textContent = finalPredictedElo || currentElo || "-";
+    document.getElementById('predictedEloText').innerHTML = `
+        <span class="text-gray-500 text-xl font-medium">${currentElo}</span>
+        <span class="text-gray-600 mx-1 text-xl">→</span>
+        <span class="text-white">${finalExpected}</span>
+    `;
     
     let trendEl = document.getElementById('eloTrendText');
-    if (trendVal > 0.5) {
-        trendEl.innerHTML = `<span class="text-green-500">Тренд: ↑ +${trendVal.toFixed(1)} Elo/гру</span>`;
-    } else if (trendVal < -0.5) {
-        trendEl.innerHTML = `<span class="text-red-500">Тренд: ↓ ${Math.abs(trendVal).toFixed(1)} Elo/гру</span>`;
-    } else {
-        trendEl.innerHTML = `<span class="text-gray-400">Тренд: Стабільний</span>`;
-    }
+    trendEl.innerHTML = `<span class="text-gray-400 font-medium">Сценарії (10 ігор): </span>
+                         <span class="text-green-500 font-bold ml-1">↑${finalOpt} (${optWins}W)</span>
+                         <span class="text-gray-600 mx-1">/</span>
+                         <span class="text-red-500 font-bold">↓${finalPes} (${pesWins}W)</span>`;
 
     let labels = Array.from({length: validMatches}, (_, i) => i + 1).concat(futureLabels);
-    let dataPoints = [...eloHistory, ...futureEloArray];
-    let pointColors = Array(validMatches).fill('#ff5500').concat(futureColors);
+    
+    let optData = Array(validMatches - 1).fill(null).concat([currentElo, ...optimisticArray]);
+    let pesData = Array(validMatches - 1).fill(null).concat([currentElo, ...pessimisticArray]);
+    let expData = [...eloHistory, ...expectedArray];
+
+    let baseColors = Array(validMatches).fill('#ff5500');
 
     if (eloChart) eloChart.destroy();
     eloChart = new Chart(document.getElementById('eloPredictionChart').getContext('2d'), {
         type: 'line',
         data: {
             labels: labels,
-            datasets: [{
-                data: dataPoints,
-                segment: {
-                    borderDash: ctx => ctx.p0DataIndex >= validMatches - 1 ? [5, 5] : undefined,
-                    borderColor: ctx => ctx.p0DataIndex >= validMatches - 1 ? '#10b981' : '#ff5500',
+            datasets: [
+                {
+                    label: 'Очікувано',
+                    data: expData,
+                    segment: {
+                        borderDash: ctx => ctx.p0DataIndex >= validMatches - 1 ? [5, 5] : undefined,
+                        borderColor: ctx => ctx.p0DataIndex >= validMatches - 1 ? '#3b82f6' : '#ff5500', 
+                    },
+                    borderWidth: 2,
+                    pointBackgroundColor: baseColors.concat(Array(futureSteps).fill('#3b82f6')),
+                    pointRadius: ctx => ctx.dataIndex === validMatches + futureSteps - 1 ? 5 : 0,
+                    pointHoverRadius: 6,
+                    fill: false,
+                    tension: 0
                 },
-                borderWidth: 2,
-                pointBackgroundColor: pointColors,
-                pointRadius: ctx => {
-                    if (ctx.dataIndex === validMatches + futureSteps - 1) return 6; 
-                    if (ctx.dataIndex >= validMatches) return 3; 
-                    return 0; 
+                {
+                    label: 'Вдала серія',
+                    data: optData,
+                    borderColor: '#10b981', 
+                    borderDash: [4, 4],
+                    borderWidth: 2,
+                    pointRadius: ctx => ctx.dataIndex === validMatches + futureSteps - 1 ? 5 : 0,
+                    pointBackgroundColor: '#10b981',
+                    fill: false,
+                    tension: 0
                 },
-                pointHoverRadius: 6,
-                fill: false,
-                tension: 0.1
-            }]
+                {
+                    label: 'Погана серія',
+                    data: pesData,
+                    borderColor: '#ef4444', 
+                    borderDash: [4, 4],
+                    borderWidth: 2,
+                    pointRadius: ctx => ctx.dataIndex === validMatches + futureSteps - 1 ? 5 : 0,
+                    pointBackgroundColor: '#ef4444',
+                    fill: false,
+                    tension: 0
+                }
+            ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { 
-                x: { display: false }, 
-                y: { 
-                    grid: { color: '#27272a' }, 
-                    ticks: { color: '#71717a', precision: 0 } 
-                } 
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(24, 24, 27, 0.95)',
+                    titleColor: '#a1a1aa', bodyColor: '#ffffff', borderColor: '#ff5500', borderWidth: 1, padding: 12, displayColors: false,
+                    callbacks: {
+                        title: function(context) {
+                            let idx = context[0].dataIndex;
+                            if (idx >= validMatches) return 'Симуляція: Матч +' + (idx - validMatches + 1);
+                            let match = matches[validMatches - 1 - idx];
+                            if (!match) return 'Матч ' + (idx + 1);
+                            let mapName = match.map ? match.map.replace('de_', '') : 'Unknown';
+                            mapName = mapName.charAt(0).toUpperCase() + mapName.slice(1);
+                            let score = match.score ? match.score.replace(' / ', ':') : '';
+                            let isWin = (match.Result === "1" || match.Win === "true" || match.win === "1");
+                            return `${isWin ? 'WIN' : 'LOSS'} ${score} | ${mapName}`;
+                        },
+                        label: function(context) {
+                            let idx = context.dataIndex;
+                            if (idx >= validMatches) {
+                                let prevElo = context.dataset.data[idx - 1];
+                                let isWinStep = context.parsed.y > prevElo;
+                                let resTxt = isWinStep ? '+25 (WIN)' : '-25 (LOSS)';
+                                
+                                if (context.datasetIndex === 1) return `Вдала серія: ${context.parsed.y} Elo [${resTxt}]`;
+                                if (context.datasetIndex === 2) return `Погана серія: ${context.parsed.y} Elo [${resTxt}]`;
+                                return `Очікувано: ${context.parsed.y} Elo [${resTxt}]`;
+                            }
+                            if (context.datasetIndex !== 0) return null; 
+                            let match = matches[validMatches - 1 - idx];
+                            let kd = match ? (parseInt(match.Kills) / (parseInt(match.Deaths) || 1)).toFixed(2) : '-';
+                            return ['Elo: ' + context.parsed.y, 'K/D: ' + kd];
+                        }
+                    }
+                }
             },
+            scales: { x: { display: false }, y: { grid: { color: '#27272a' }, ticks: { color: '#71717a', precision: 0 } } },
             interaction: { mode: 'index', intersect: false }
         }
     });
@@ -582,9 +682,9 @@ function renderAnalytics(recentForm, currentElo, matches) {
 
     let meanKD = kdArray.reduce((a, b) => a + b, 0) / validMatches;
     let sumSquaredDiffs = kdArray.reduce((sum, kd) => sum + Math.pow(kd - meanKD, 2), 0);
-    let stdDev = Math.sqrt(sumSquaredDiffs / validMatches);
+    let kdStdDev = Math.sqrt(sumSquaredDiffs / validMatches);
 
-    let stabilityScore = Math.max(0, 100 - (stdDev * 75)); 
+    let stabilityScore = Math.max(0, 100 - (kdStdDev * 75)); 
     let roundedScore = Math.round(stabilityScore);
 
     let statusText = "Максимальна";
