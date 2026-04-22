@@ -476,21 +476,33 @@ function analyticsTooltipHandler(context, config) {
 
         if (dataIndex >= validMatches) {
             let step = dataIndex - validMatches + 1;
-            let prevElo = context.chart.data.datasets[dp.datasetIndex].data[dataIndex - 1];
-            let currentElo = dp.parsed.y;
-            let isWinStep = currentElo > prevElo;
-            let datasetLabel = context.chart.data.datasets[dp.datasetIndex].label;
             
-            metricsHtml = `
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Сценарій</span><span class="text-white font-bold text-[13px]">${datasetLabel}</span></div>
-                <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Зміна</span><span class="${isWinStep ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${isWinStep ? '+25 (WIN)' : '-25 (LOSS)'}</span></div>
-                <div class="flex justify-between mt-1"><span class="text-gray-500 uppercase font-bold text-[10px]">Прогноз Elo</span><span class="text-white font-bold text-[14px]">${currentElo}</span></div>
-            `;
+            metricsHtml = tooltipModel.dataPoints.map(point => {
+                let val = point.parsed.y;
+                let datasetLabel = context.chart.data.datasets[point.datasetIndex].label;
+                let colorClass = point.datasetIndex === 1 ? 'text-green-400' : (point.datasetIndex === 2 ? 'text-red-400' : 'text-blue-400');
+                
+                let prevElo = context.chart.data.datasets[point.datasetIndex].data[dataIndex - 1];
+                let isWinStep = val > prevElo;
+                let changeTxt = isWinStep ? '+25 (WIN)' : '-25 (LOSS)';
+
+                return `
+                    <div class="flex justify-between items-center gap-2 mt-2 border-b border-gray-800/50 pb-1.5">
+                        <span class="text-gray-400 font-bold text-[10px] uppercase">${datasetLabel}</span>
+                        <div class="text-right">
+                            <span class="${colorClass} font-bold text-[15px] block leading-tight">${val} Elo</span>
+                            <span class="text-xs font-bold tracking-wide ${isWinStep ? 'text-green-400' : 'text-red-400'}">${changeTxt}</span>
+                        </div>
+                    </div>`;
+            }).join('');
 
             tooltipEl.innerHTML = `
-                <div class="bg-[#18181b]/98 border border-faceit/50 rounded-xl shadow-2xl p-4 backdrop-blur-md">
-                    <div class="text-[11px] text-faceit font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2">🔮 Симуляція Монте-Карло: Матч +${step}</div>
-                    <div class="space-y-2 font-mono">${metricsHtml}</div>
+                <div class="bg-[#18181b]/98 border border-faceit/30 rounded-xl shadow-2xl p-4 backdrop-blur-md">
+                    <div class="text-[11px] text-faceit font-bold uppercase tracking-wider mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        Симуляція: Матч +${step}
+                    </div>
+                    <div class="space-y-1 font-mono">${metricsHtml}</div>
                 </div>
             `;
         } else {
@@ -520,10 +532,29 @@ function analyticsTooltipHandler(context, config) {
                 <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">Elo після гри</span><span class="text-white font-bold text-[13px]">${dp.parsed.y}</span></div>
                 <div class="flex justify-between"><span class="text-gray-500 uppercase font-bold text-[10px]">K/D у матчі</span><span class="${kd >= 1 ? 'text-green-400' : 'text-red-400'} font-bold text-[13px]">${kd}</span></div>
             `;
+            
+            tooltipEl.innerHTML = `
+                <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
+                    <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        ${dateStr}
+                    </div>
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="flex items-center gap-3">
+                            <img src="assets/maps/${safeMapName}.png" onerror="this.src='assets/maps/unknown.png'" class="w-8 h-8 object-contain drop-shadow-md">
+                            <span class="text-sm font-bold text-white capitalize">${mapName}</span>
+                        </div>
+                        <span class="text-xs font-black ${isWin ? 'text-green-400 bg-green-500/10' : 'text-red-400 bg-red-500/10'} px-2 py-1 rounded border ${isWin ? 'border-green-500/20' : 'border-red-500/20'}">
+                            ${isWin ? 'W' : 'L'} ${score}
+                        </span>
+                    </div>
+                    <div class="space-y-2 font-mono">${metricsHtml}</div>
+                </div>
+            `;
         }
     }
 
-    if ((config.type === 'cluster') || (config.type === 'elo' && dp.dataIndex < config.validMatches)) {
+    if (config.type === 'cluster') {
         tooltipEl.innerHTML = `
             <div class="bg-[#18181b]/98 border ${isWin ? 'border-green-500/30' : 'border-red-500/30'} rounded-xl shadow-2xl p-4 backdrop-blur-md">
                 <div class="text-[11px] text-gray-400 font-bold uppercase tracking-wider mb-3 border-b border-gray-800 pb-2 flex items-center gap-2">
@@ -757,9 +788,9 @@ function renderAnalytics(recentForm, currentElo, matches) {
     let lowPct = Math.round((lowPts.length / validMatches) * 100);
 
     document.getElementById('clusterSummaryText').innerHTML = 
-        `<span class="text-green-400 font-bold">${starPct}% Зірка</span> • 
-         <span class="text-yellow-500 font-bold">${midPct}% База</span> • 
-         <span class="text-red-400 font-bold">${lowPct}% Спади</span>`;
+        `<span class="text-green-400 font-bold">${starPct}% Carry</span> • 
+         <span class="text-yellow-500 font-bold">${midPct}% Average</span> • 
+         <span class="text-red-400 font-bold">${lowPct}% Low impact</span>`;
 
     if (clusterChartInstance) clusterChartInstance.destroy();
     clusterChartInstance = new Chart(document.getElementById('clusterChart').getContext('2d'), {
@@ -767,7 +798,7 @@ function renderAnalytics(recentForm, currentElo, matches) {
         data: {
             datasets: [
                 {
-                    label: 'Зіркові матчі',
+                    label: 'Carry (Високий імпакт)',
                     data: starPts,
                     backgroundColor: '#10b981', 
                     borderColor: 'rgba(16, 185, 129, 0.5)',
@@ -775,7 +806,7 @@ function renderAnalytics(recentForm, currentElo, matches) {
                     pointHoverRadius: 8
                 },
                 {
-                    label: 'Стабільна база',
+                    label: 'Average (Середній імпакт)',
                     data: midPts,
                     backgroundColor: '#eab308', 
                     borderColor: 'rgba(234, 179, 8, 0.5)',
@@ -783,7 +814,7 @@ function renderAnalytics(recentForm, currentElo, matches) {
                     pointHoverRadius: 8
                 },
                 {
-                    label: 'Важкі матчі',
+                    label: 'Low Impact (Низький імпакт)',
                     data: lowPts,
                     backgroundColor: '#ef4444', 
                     borderColor: 'rgba(239, 68, 68, 0.5)',
@@ -923,6 +954,58 @@ function renderAnalytics(recentForm, currentElo, matches) {
         }
     });
 
+    let winCondContainer = document.getElementById('winConditionsContainer');
+    if (winCondContainer) {
+        let baselineWr = Math.round((recentWins / validMatches) * 100);
+
+        let highAdrMatches = matches.filter(m => (parseFloat(m.ADR) || 0) >= avgADR);
+        let highAdrWins = highAdrMatches.filter(m => (m.Result === "1" || m.Win === "true" || m.win === "1")).length;
+        let highAdrWr = highAdrMatches.length > 0 ? Math.round((highAdrWins / highAdrMatches.length) * 100) : 0;
+
+        let highKdMatches = matches.filter(m => (parseInt(m.Kills) / (parseInt(m.Deaths) || 1)) >= 1.15);
+        let highKdWins = highKdMatches.filter(m => (m.Result === "1" || m.Win === "true" || m.win === "1")).length;
+        let highKdWr = highKdMatches.length > 0 ? Math.round((highKdWins / highKdMatches.length) * 100) : 0;
+
+        let assistMatches = matches.filter(m => (parseInt(m.Assists) || 0) >= 5);
+        let assistWins = assistMatches.filter(m => (m.Result === "1" || m.Win === "true" || m.win === "1")).length;
+        let assistWr = assistMatches.length > 0 ? Math.round((assistWins / assistMatches.length) * 100) : 0;
+
+        function getWrColor(wrVal, baseline) {
+            if (wrVal >= baseline + 10) return 'text-green-400';
+            if (wrVal <= baseline - 10) return 'text-red-400';
+            return 'text-yellow-400';
+        }
+
+        winCondContainer.innerHTML = `
+            <div class="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> ADR вище ${Math.round(avgADR)}
+                </span>
+                <div class="flex items-end justify-between mt-2">
+                    <span class="text-3xl font-black ${getWrColor(highAdrWr, baselineWr)}">${highAdrWr}%</span>
+                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Вінрейт</span>
+                </div>
+            </div>
+            <div class="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span> K/D більше 1.15
+                </span>
+                <div class="flex items-end justify-between mt-2">
+                    <span class="text-3xl font-black ${getWrColor(highKdWr, baselineWr)}">${highKdWr}%</span>
+                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Вінрейт</span>
+                </div>
+            </div>
+            <div class="bg-[#18181b] border border-gray-800 rounded-xl p-4 flex flex-col justify-between shadow-inner">
+                <span class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> 5+ Асистів за гру
+                </span>
+                <div class="flex items-end justify-between mt-2">
+                    <span class="text-3xl font-black ${getWrColor(assistWr, baselineWr)}">${assistWr}%</span>
+                    <span class="text-[10px] text-gray-500 font-bold uppercase tracking-widest">Вінрейт</span>
+                </div>
+            </div>
+        `;
+    }
 }
 
 function renderPlayActivity(matches) {
