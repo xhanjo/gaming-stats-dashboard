@@ -44,452 +44,449 @@
       }
     </style>
   </head>
-  <body class="bg-dark text-gray-200 font-sans min-h-screen p-4 md:p-8 selection:bg-faceit selection:text-white">
-    <div class="max-w-5xl mx-auto">
-      <div class="mb-10 flex flex-col md:flex-row justify-between items-center gap-6">
-        <div class="cursor-pointer group" onclick="goHome()">
-          <h1 class="text-4xl font-extrabold text-white tracking-tight group-hover:text-gray-300 transition-colors">
-            CS2
-            <span class="text-faceit">Analytics</span>
-          </h1>
-          <p class="text-gray-500 text-sm mt-1">Платформа ігрової статистики</p>
-        </div>
-
-        <div class="w-full md:w-auto">
-          <form
-            onsubmit="
-              searchPlayer(event);
-              return false;
-            "
-            class="flex shadow-lg rounded-lg overflow-hidden border border-gray-800 bg-card">
-            <input type="text" id="nicknameInput" placeholder="Нікнейм на Faceit..." class="w-full md:w-72 bg-transparent text-white px-4 py-3 outline-none focus:bg-gray-800 transition-colors" />
-            <button type="submit" id="searchBtn" class="bg-faceit hover:bg-orange-600 text-white font-semibold px-6 py-3 transition-colors flex items-center gap-2">
-              <span id="btnText">Знайти</span>
-              <div id="btnSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            </button>
-          </form>
-          <div id="searchHistory" class="flex gap-2 mt-3 flex-wrap justify-center md:justify-start"></div>
-        </div>
-      </div>
-
-      <div id="errorMessage" class="hidden bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-center font-medium"></div>
-
-      <div id="mainLoader" class="hidden flex flex-col items-center justify-center py-20">
-        <div class="loader w-12 h-12 border-4 border-gray-700 rounded-full mb-4"></div>
-        <p class="text-gray-400 font-medium animate-pulse">Аналізуємо матчі та будуємо графіки...</p>
-      </div>
-
-      <div id="playerCard" class="hidden">
-        <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
-          <div class="flex items-center gap-5">
-            <img
-              id="playerAvatar"
-              src=""
-              onerror="
-                this.classList.add('hidden');
-                document.getElementById('playerAvatarFallback').classList.remove('hidden');
-              "
-              class="w-20 h-20 rounded-full border-2 border-gray-700 object-cover hidden shadow-lg" />
-            <div id="playerAvatarFallback" class="w-20 h-20 rounded-full border-2 border-gray-700 bg-[#141414] flex items-center justify-center shadow-inner">
-              <svg class="w-12 h-12 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.11v4.71c0 4.14-2.83 8.01-7 9-4.17-.99-7-4.86-7-9V6.29l7-3.11z" />
-                <path d="M12 7c-1.66 0-3 1.34-3 3s1.34 3 3 3s3-1.34 3-3s-1.34-3-3-3zm0 2a1 1 0 1 1 0 2a1 1 0 0 1 0-2zm0 6c-2.33 0-7 1.17-7 3.5V17h14v-.5c0-2.33-4.67-3.5-7-3.5zm-5 1.4c.5-.2 2.3-.6 5-.6s4.5.4 5 .6V16H7v-.6z" opacity=".5" />
-              </svg>
-            </div>
-
-            <div class="flex flex-col">
-              <div class="flex items-center gap-3 mb-2">
-                <h2 id="playerName" class="text-3xl font-bold text-white tracking-wide">-</h2>
-                <img id="playerFlag" src="" class="w-6 h-4 rounded-sm hidden shadow-sm cursor-help" />
-              </div>
-              <div class="flex gap-3">
-                <a id="linkFaceit" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
-                  <img src="assets/faceit.svg" class="w-full h-full object-contain" />
-                </a>
-                <a id="linkSteam" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
-                  <img src="assets/steam.svg" class="w-full h-full object-contain" />
-                </a>
-              </div>
-            </div>
+  <body class="bg-dark text-gray-200 font-sans flex flex-col min-h-screen p-4 md:p-8 selection:bg-faceit selection:text-white">
+    <div class="max-w-5xl mx-auto w-full flex flex-col flex-grow">
+      <div class="flex-grow pb-12">
+        <div class="mb-10 flex flex-col md:flex-row justify-between items-center gap-6">
+          <div class="cursor-pointer group" onclick="goHome()">
+            <h1 class="text-4xl font-extrabold text-white tracking-tight group-hover:text-gray-300 transition-colors">
+              CS2
+              <span class="text-faceit">Analytics</span>
+            </h1>
+            <p class="text-gray-500 text-sm mt-1">Платформа ігрової статистики</p>
           </div>
 
-          <div class="flex gap-8 items-center">
-            <div class="text-center">
-              <span class="text-xs text-gray-500 font-semibold uppercase tracking-widest">Elo</span>
-              <div id="playerElo" class="text-2xl md:text-3xl font-bold text-white tracking-tight">-</div>
+          <div class="w-full md:w-auto">
+            <div class="flex shadow-lg rounded-lg overflow-hidden border border-gray-800 bg-card">
+              <input type="text" id="nicknameInput" placeholder="Нікнейм на Faceit..." class="w-full md:w-72 bg-transparent text-white px-4 py-3 outline-none focus:bg-gray-800 transition-colors" />
+              <button type="button" id="searchBtn" class="bg-faceit hover:bg-orange-600 text-white font-semibold px-6 py-3 transition-colors flex items-center gap-2">
+                <span id="btnText">Знайти</span>
+                <div id="btnSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              </button>
             </div>
-            <div class="w-16 h-16 flex items-center justify-center">
+            <div id="searchHistory" class="flex gap-2 mt-3 flex-wrap justify-center md:justify-start"></div>
+          </div>
+        </div>
+
+        <div id="errorMessage" class="hidden bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6 text-center font-medium"></div>
+
+        <div id="mainLoader" class="hidden flex flex-col items-center justify-center py-20">
+          <div class="loader w-12 h-12 border-4 border-gray-700 rounded-full mb-4"></div>
+          <p class="text-gray-400 font-medium animate-pulse">Аналізуємо матчі та будуємо графіки...</p>
+        </div>
+
+        <div id="playerCard" class="hidden">
+          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-5">
               <img
-                id="playerLevelIcon"
-                data-lvl=""
+                id="playerAvatar"
                 src=""
                 onerror="
-                  this.onerror = null;
-                  this.src = 'https://cdn-frontend.faceit.com/m/master/app/assets/images/badges/skill_level_' + this.dataset.lvl + '_svg.svg';
+                  this.classList.add('hidden');
+                  document.getElementById('playerAvatarFallback').classList.remove('hidden');
                 "
-                class="w-full h-full object-contain hidden pointer-events-none" />
-              <span id="playerLevelFallback" class="text-xl font-bold text-gray-500">-</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-gray-800 px-2 mt-6 gap-4 pb-0">
-          <div class="flex gap-6 overflow-x-auto scrollbar-hide w-full sm:w-auto">
-            <button id="btn-tab-summary" onclick="switchTab('tab-summary')" class="tab-btn pb-3 text-sm font-bold text-faceit border-b-2 border-faceit transition-all">Огляд</button>
-            <button id="btn-tab-matches" onclick="switchTab('tab-matches')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Історія матчів</button>
-            <button id="btn-tab-maps" onclick="switchTab('tab-maps')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Мапи</button>
-            <button id="btn-tab-activity" onclick="switchTab('tab-activity')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Активність</button>
-            <button id="btn-tab-analytics" onclick="switchTab('tab-analytics')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Аналітика</button>
-          </div>
-
-          <button id="deepScanBtn" onclick="searchPlayer(null, 100, true)" class="flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors mb-2 sm:mb-2 group">
-            <svg class="w-3.5 h-3.5 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
-            </svg>
-            Глибокий аналіз (100 матчів)
-          </button>
-        </div>
-        <div id="tab-summary" class="space-y-6 mt-6">
-          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
-            <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
-              <svg class="w-4 h-4 text-faceit" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" />
-              </svg>
-              Остання активність (K/D Тренд)
-            </h3>
-            <div class="h-28 w-full mb-3">
-              <canvas id="trendChart"></canvas>
-            </div>
-            <div id="matchResults" class="flex w-full mt-2"></div>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div class="bg-card border border-gray-800 rounded-2xl p-6">
-              <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider">Загальна статистика (Lifetime)</h3>
-              <div class="space-y-4">
-                <div class="flex justify-between border-b border-gray-800 pb-2">
-                  <span>Всього матчів</span>
-                  <strong id="playerMatches" class="text-white font-mono">-</strong>
-                </div>
-                <div class="flex justify-between border-b border-gray-800 pb-2">
-                  <span>Win Rate</span>
-                  <strong id="playerWinrate" class="text-green-400 font-mono">-</strong>
-                </div>
-                <div class="flex justify-between">
-                  <span>Загальний K/D</span>
-                  <strong id="playerLifetimeKD" class="text-white font-mono">-</strong>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-card border border-gray-800 rounded-2xl p-6">
-              <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider">Форма (останні 30 матчів)</h3>
-              <div class="grid grid-cols-2 gap-4">
-                <div class="bg-gray-800/30 p-3 rounded-lg text-center">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Справжній K/D</div>
-                  <div id="playerKD" class="text-xl font-bold">-</div>
-                </div>
-                <div class="bg-gray-800/30 p-3 rounded-lg text-center">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Середній K/R</div>
-                  <div id="playerKR" class="text-xl font-bold">-</div>
-                </div>
-                <div class="bg-gray-800/30 p-3 rounded-lg text-center">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Середній ADR</div>
-                  <div id="playerADR" class="text-xl font-bold text-faceit">-</div>
-                </div>
-                <div class="bg-gray-800/30 p-3 rounded-lg text-center">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Headshots</div>
-                  <div id="playerHS" class="text-xl font-bold">-</div>
-                </div>
-                <div class="bg-gray-800/40 p-3 rounded-lg text-center border border-blue-500/20">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Entry Kills</div>
-                  <div id="playerEntry" class="text-xl font-bold text-blue-400">-</div>
-                </div>
-                <div class="bg-gray-800/40 p-3 rounded-lg text-center border border-green-500/20">
-                  <div class="text-xs text-gray-500 mb-1 font-bold">Sniper kills</div>
-                  <div id="playerSniper" class="text-xl font-bold text-green-400">-</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
-            <div class="flex gap-2 mb-6">
-              <button id="btn-kd" type="button" onclick="changeChart('kd')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-faceit text-white transition-colors">K/D</button>
-              <button id="btn-kr" type="button" onclick="changeChart('kr')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">K/R</button>
-              <button id="btn-hs" type="button" onclick="changeChart('hs')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">HS%</button>
-              <button id="btn-adr" type="button" onclick="changeChart('adr')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">ADR</button>
-            </div>
-
-            <div class="flex flex-col md:flex-row gap-4">
-              <div class="flex-grow h-64 md:h-80 border border-gray-800 rounded-lg p-4 bg-[#18181b] min-w-0">
-                <canvas id="performanceChart"></canvas>
-              </div>
-
-              <div class="w-full md:w-56 shrink-0 bg-[#18181b] border border-gray-800 rounded-lg p-5 flex flex-col justify-between">
-                <div>
-                  <div id="panelCurrentVal" class="text-3xl font-bold text-white mb-1">-</div>
-                  <div id="panelMetricName" class="text-sm font-bold text-gray-400 uppercase">K/D</div>
-                </div>
-                <div class="space-y-3 text-sm mt-8">
-                  <div class="flex justify-between items-center border-b border-gray-800 pb-2 gap-2">
-                    <span class="text-gray-400">Максимум</span>
-                    <span id="panelHighVal" class="text-white font-bold">-</span>
-                  </div>
-                  <div class="flex justify-between items-center gap-2">
-                    <span class="text-gray-400">Мінімум</span>
-                    <span id="panelLowVal" class="text-white font-bold">-</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div id="tab-matches" class="hidden mt-6">
-          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-x-auto scrollbar-hide">
-            <h3 class="text-base font-bold text-white mb-4 uppercase tracking-wider">Останні матчі</h3>
-            <table class="w-full text-left whitespace-nowrap min-w-[650px]">
-              <thead class="text-gray-500 border-b border-gray-800 text-[11px] md:text-sm">
-                <tr>
-                  <th class="pb-3 font-bold uppercase tracking-wider pl-2 pr-4">Дата</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider pr-4">Карта</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider pr-4">Рахунок</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider pr-4">K / D / A</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider pr-4">K/D</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider pr-4">ADR</th>
-                  <th class="pb-3 font-bold uppercase tracking-wider">HS %</th>
-                </tr>
-              </thead>
-              <tbody id="matchHistoryTableBody" class="divide-y divide-gray-800/50"></tbody>
-            </table>
-            <div class="mt-6 flex justify-center">
-              <button id="loadMoreMatchesBtn" onclick="loadMoreMatches()" class="hidden px-6 py-2 bg-[#18181b] hover:bg-gray-800 border border-gray-700 rounded-lg text-sm font-bold text-gray-300 hover:text-white transition-colors">Завантажити ще</button>
-            </div>
-          </div>
-        </div>
-
-        <div id="tab-maps" class="hidden mt-6">
-          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
-            <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex justify-between items-center">
-              <span class="flex items-center gap-2">
-                <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" />
+                class="w-20 h-20 rounded-full border-2 border-gray-700 object-cover hidden shadow-lg" />
+              <div id="playerAvatarFallback" class="w-20 h-20 rounded-full border-2 border-gray-700 bg-[#141414] flex items-center justify-center shadow-inner">
+                <svg class="w-12 h-12 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.11v4.71c0 4.14-2.83 8.01-7 9-4.17-.99-7-4.86-7-9V6.29l7-3.11z" />
+                  <path d="M12 7c-1.66 0-3 1.34-3 3s1.34 3 3 3s3-1.34 3-3s-1.34-3-3-3zm0 2a1 1 0 1 1 0 2a1 1 0 0 1 0-2zm0 6c-2.33 0-7 1.17-7 3.5V17h14v-.5c0-2.33-4.67-3.5-7-3.5zm-5 1.4c.5-.2 2.3-.6 5-.6s4.5.4 5 .6V16H7v-.6z" opacity=".5" />
                 </svg>
-                Ефективність по картах (Lifetime)
-              </span>
-              <span class="bg-faceit/20 text-faceit px-2 py-0.5 rounded text-[10px] tracking-widest border border-faceit/30">5V5</span>
-            </h3>
-            <div id="mapStatsContainer" class="space-y-3"></div>
-          </div>
-        </div>
+              </div>
 
-        <div id="tab-activity" class="hidden mt-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-              <div>
-                <div id="paMatches" class="text-4xl font-bold text-white mb-1">0</div>
-                <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Зіграно матчів</div>
-              </div>
-              <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                <span class="text-gray-500">Днів у грі</span>
-                <span id="paDays" class="text-white">0</span>
-              </div>
-            </div>
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-              <div>
-                <div id="paMonth" class="text-2xl font-bold text-white mb-1">-</div>
-                <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніший місяць</div>
-              </div>
-              <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                <span class="text-gray-500">Зіграно матчів</span>
-                <span id="paMonthMatches" class="text-white">0</span>
+              <div class="flex flex-col">
+                <div class="flex items-center gap-3 mb-2">
+                  <h2 id="playerName" class="text-3xl font-bold text-white tracking-wide">-</h2>
+                  <img id="playerFlag" src="" class="w-6 h-4 rounded-sm hidden shadow-sm cursor-help" />
+                </div>
+                <div class="flex gap-3">
+                  <a id="linkFaceit" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
+                    <img src="assets/faceit.svg" class="w-full h-full object-contain" />
+                  </a>
+                  <a id="linkSteam" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
+                    <img src="assets/steam.svg" class="w-full h-full object-contain" />
+                  </a>
+                </div>
               </div>
             </div>
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
-              <div>
-                <div id="paHour" class="text-2xl font-bold text-white mb-1">-</div>
-                <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніша година</div>
+
+            <div class="flex gap-8 items-center">
+              <div class="text-center">
+                <span class="text-xs text-gray-500 font-semibold uppercase tracking-widest">Elo</span>
+                <div id="playerElo" class="text-2xl md:text-3xl font-bold text-white tracking-tight">-</div>
               </div>
-              <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                <span class="text-gray-500">Win rate</span>
-                <span id="paHourWinrate" class="text-green-400">0%</span>
+              <div class="w-16 h-16 flex items-center justify-center">
+                <img
+                  id="playerLevelIcon"
+                  data-lvl=""
+                  src=""
+                  onerror="
+                    this.onerror = null;
+                    this.src = 'https://cdn-frontend.faceit.com/m/master/app/assets/images/badges/skill_level_' + this.dataset.lvl + '_svg.svg';
+                  "
+                  class="w-full h-full object-contain hidden pointer-events-none" />
+                <span id="playerLevelFallback" class="text-xl font-bold text-gray-500">-</span>
               </div>
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end border-b border-gray-800 px-2 mt-6 gap-4 pb-0">
+            <div class="flex gap-6 overflow-x-auto scrollbar-hide w-full sm:w-auto">
+              <button id="btn-tab-summary" onclick="switchTab('tab-summary')" class="tab-btn pb-3 text-sm font-bold text-faceit border-b-2 border-faceit transition-all">Огляд</button>
+              <button id="btn-tab-matches" onclick="switchTab('tab-matches')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Історія матчів</button>
+              <button id="btn-tab-maps" onclick="switchTab('tab-maps')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Мапи</button>
+              <button id="btn-tab-activity" onclick="switchTab('tab-activity')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Активність</button>
+              <button id="btn-tab-analytics" onclick="switchTab('tab-analytics')" class="tab-btn pb-3 text-sm font-bold text-gray-400 border-b-2 border-transparent hover:text-gray-200 transition-all">Аналітика</button>
+            </div>
+
+            <button id="deepScanBtn" onclick="searchPlayer(null, 100, true)" class="flex items-center gap-2 text-xs font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/30 px-3 py-1.5 rounded-lg hover:bg-indigo-500/20 transition-colors mb-2 sm:mb-2 group">
+              <svg class="w-3.5 h-3.5 group-hover:animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+              </svg>
+              Глибокий аналіз (100 матчів)
+            </button>
+          </div>
+          <div id="tab-summary" class="space-y-6 mt-6">
             <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <div class="text-xl font-bold text-white flex items-center gap-2">
-                    <span id="paAvgDaily">0.0</span>
-                    <span class="text-xs text-green-500 font-bold">↑</span>
+              <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex items-center gap-2">
+                <svg class="w-4 h-4 text-faceit" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z" />
+                </svg>
+                Остання активність (K/D Тренд)
+              </h3>
+              <div class="h-28 w-full mb-3">
+                <canvas id="trendChart"></canvas>
+              </div>
+              <div id="matchResults" class="flex w-full mt-2"></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="bg-card border border-gray-800 rounded-2xl p-6">
+                <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider">Загальна статистика (Lifetime)</h3>
+                <div class="space-y-4">
+                  <div class="flex justify-between border-b border-gray-800 pb-2">
+                    <span>Всього матчів</span>
+                    <strong id="playerMatches" class="text-white font-mono">-</strong>
                   </div>
-                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на день (в сер.)</div>
-                </div>
-                <div class="flex gap-3 text-xs font-bold">
-                  <span class="flex items-center gap-1 text-gray-300">
-                    <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
-                    Матчі
-                  </span>
-                  <span class="flex items-center gap-1 text-green-500">
-                    <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                    Перемоги
-                  </span>
+                  <div class="flex justify-between border-b border-gray-800 pb-2">
+                    <span>Win Rate</span>
+                    <strong id="playerWinrate" class="text-green-400 font-mono">-</strong>
+                  </div>
+                  <div class="flex justify-between">
+                    <span>Загальний K/D</span>
+                    <strong id="playerLifetimeKD" class="text-white font-mono">-</strong>
+                  </div>
                 </div>
               </div>
-              <div class="h-32"><canvas id="dailyActivityChart"></canvas></div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6">
+                <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider">Форма (останні 30 матчів)</h3>
+                <div class="grid grid-cols-2 gap-4">
+                  <div class="bg-gray-800/30 p-3 rounded-lg text-center">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Справжній K/D</div>
+                    <div id="playerKD" class="text-xl font-bold">-</div>
+                  </div>
+                  <div class="bg-gray-800/30 p-3 rounded-lg text-center">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Середній K/R</div>
+                    <div id="playerKR" class="text-xl font-bold">-</div>
+                  </div>
+                  <div class="bg-gray-800/30 p-3 rounded-lg text-center">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Середній ADR</div>
+                    <div id="playerADR" class="text-xl font-bold text-faceit">-</div>
+                  </div>
+                  <div class="bg-gray-800/30 p-3 rounded-lg text-center">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Headshots</div>
+                    <div id="playerHS" class="text-xl font-bold">-</div>
+                  </div>
+                  <div class="bg-gray-800/40 p-3 rounded-lg text-center border border-blue-500/20">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Entry Kills</div>
+                    <div id="playerEntry" class="text-xl font-bold text-blue-400">-</div>
+                  </div>
+                  <div class="bg-gray-800/40 p-3 rounded-lg text-center border border-green-500/20">
+                    <div class="text-xs text-gray-500 mb-1 font-bold">Sniper kills</div>
+                    <div id="playerSniper" class="text-xl font-bold text-green-400">-</div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <div class="text-xl font-bold text-white flex items-center gap-2">
-                    <span id="paAvgWeekly">0.0</span>
-                    <span class="text-xs text-green-500 font-bold">↑</span>
-                  </div>
-                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на тиждень (в сер.)</div>
+              <div class="flex gap-2 mb-6">
+                <button id="btn-kd" type="button" onclick="changeChart('kd')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-faceit text-white transition-colors">K/D</button>
+                <button id="btn-kr" type="button" onclick="changeChart('kr')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">K/R</button>
+                <button id="btn-hs" type="button" onclick="changeChart('hs')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">HS%</button>
+                <button id="btn-adr" type="button" onclick="changeChart('adr')" class="px-5 py-1.5 rounded-full text-sm font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors">ADR</button>
+              </div>
+
+              <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-grow h-64 md:h-80 border border-gray-800 rounded-lg p-4 bg-[#18181b] min-w-0">
+                  <canvas id="performanceChart"></canvas>
                 </div>
-                <div class="flex gap-3 text-xs font-bold">
-                  <span class="flex items-center gap-1 text-gray-300">
-                    <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
-                    Матчі
-                  </span>
-                  <span class="flex items-center gap-1 text-green-500">
-                    <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
-                    Перемоги
-                  </span>
+
+                <div class="w-full md:w-56 shrink-0 bg-[#18181b] border border-gray-800 rounded-lg p-5 flex flex-col justify-between">
+                  <div>
+                    <div id="panelCurrentVal" class="text-3xl font-bold text-white mb-1">-</div>
+                    <div id="panelMetricName" class="text-sm font-bold text-gray-400 uppercase">K/D</div>
+                  </div>
+                  <div class="space-y-3 text-sm mt-8">
+                    <div class="flex justify-between items-center border-b border-gray-800 pb-2 gap-2">
+                      <span class="text-gray-400">Максимум</span>
+                      <span id="panelHighVal" class="text-white font-bold">-</span>
+                    </div>
+                    <div class="flex justify-between items-center gap-2">
+                      <span class="text-gray-400">Мінімум</span>
+                      <span id="panelLowVal" class="text-white font-bold">-</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="h-32"><canvas id="weeklyActivityChart"></canvas></div>
+            </div>
+          </div>
+          <div id="tab-matches" class="hidden mt-6">
+            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-x-auto scrollbar-hide">
+              <h3 class="text-base font-bold text-white mb-4 uppercase tracking-wider">Останні матчі</h3>
+              <table class="w-full text-left whitespace-nowrap min-w-[650px]">
+                <thead class="text-gray-500 border-b border-gray-800 text-[11px] md:text-sm">
+                  <tr>
+                    <th class="pb-3 font-bold uppercase tracking-wider pl-2 pr-4">Дата</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider pr-4">Карта</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider pr-4">Рахунок</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider pr-4">K / D / A</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider pr-4">K/D</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider pr-4">ADR</th>
+                    <th class="pb-3 font-bold uppercase tracking-wider">HS %</th>
+                  </tr>
+                </thead>
+                <tbody id="matchHistoryTableBody" class="divide-y divide-gray-800/50"></tbody>
+              </table>
+              <div class="mt-6 flex justify-center">
+                <button id="loadMoreMatchesBtn" onclick="loadMoreMatches()" class="hidden px-6 py-2 bg-[#18181b] hover:bg-gray-800 border border-gray-700 rounded-lg text-sm font-bold text-gray-300 hover:text-white transition-colors">Завантажити ще</button>
+              </div>
             </div>
           </div>
 
-          <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-hidden">
-            <h3 class="text-base font-bold text-white mb-6">Графік активності</h3>
-            <div class="overflow-x-auto scrollbar-hide pb-4">
-              <div class="flex gap-4" style="min-width: 800px">
-                <div class="flex flex-col text-[10px] text-gray-500 font-bold">
-                  <div class="mb-2 pb-1 opacity-0 text-[10px]">Місяць</div>
-                  <div class="grid grid-rows-7 gap-1 md:gap-1.5">
-                    <div class="h-3 md:h-3.5 flex items-center">П</div>
-                    <div class="h-3 md:h-3.5 flex items-center">В</div>
-                    <div class="h-3 md:h-3.5 flex items-center">С</div>
-                    <div class="h-3 md:h-3.5 flex items-center">Ч</div>
-                    <div class="h-3 md:h-3.5 flex items-center">П</div>
-                    <div class="h-3 md:h-3.5 flex items-center">С</div>
-                    <div class="h-3 md:h-3.5 flex items-center">Н</div>
-                  </div>
+          <div id="tab-maps" class="hidden mt-6">
+            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+              <h3 class="text-gray-400 text-sm font-bold mb-4 uppercase tracking-wider flex justify-between items-center">
+                <span class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z" />
+                  </svg>
+                  Ефективність по картах (Lifetime)
+                </span>
+                <span class="bg-faceit/20 text-faceit px-2 py-0.5 rounded text-[10px] tracking-widest border border-faceit/30">5V5</span>
+              </h3>
+              <div id="mapStatsContainer" class="space-y-3"></div>
+            </div>
+          </div>
+
+          <div id="tab-activity" class="hidden mt-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                  <div id="paMatches" class="text-4xl font-bold text-white mb-1">0</div>
+                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Зіграно матчів</div>
                 </div>
-                <div id="heatmapGrid" class="flex flex-1 justify-between gap-4 w-full"></div>
+                <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
+                  <span class="text-gray-500">Днів у грі</span>
+                  <span id="paDays" class="text-white">0</span>
+                </div>
+              </div>
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                  <div id="paMonth" class="text-2xl font-bold text-white mb-1">-</div>
+                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніший місяць</div>
+                </div>
+                <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
+                  <span class="text-gray-500">Зіграно матчів</span>
+                  <span id="paMonthMatches" class="text-white">0</span>
+                </div>
+              </div>
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                <div>
+                  <div id="paHour" class="text-2xl font-bold text-white mb-1">-</div>
+                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніша година</div>
+                </div>
+                <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
+                  <span class="text-gray-500">Win rate</span>
+                  <span id="paHourWinrate" class="text-green-400">0%</span>
+                </div>
               </div>
             </div>
-            <div class="flex gap-4 items-center mt-4 text-xs font-bold text-gray-500">
-              <span>Зіграно матчів</span>
-              <span class="flex items-center gap-1">
-                <span class="w-3 h-3 rounded-sm bg-[#d946ef]"></span>
-                Багато
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="w-3 h-3 rounded-sm bg-[#a21caf]"></span>
-                Середньо
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="w-3 h-3 rounded-sm bg-[#6b21a8]"></span>
-                Мало
-              </span>
-              <span class="flex items-center gap-1">
-                <span class="w-3 h-3 rounded-sm bg-[#18181b] border border-gray-800"></span>
-                Немає
-              </span>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <div class="text-xl font-bold text-white flex items-center gap-2">
+                      <span id="paAvgDaily">0.0</span>
+                      <span class="text-xs text-green-500 font-bold">↑</span>
+                    </div>
+                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на день (в сер.)</div>
+                  </div>
+                  <div class="flex gap-3 text-xs font-bold">
+                    <span class="flex items-center gap-1 text-gray-300">
+                      <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                      Матчі
+                    </span>
+                    <span class="flex items-center gap-1 text-green-500">
+                      <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                      Перемоги
+                    </span>
+                  </div>
+                </div>
+                <div class="h-32"><canvas id="dailyActivityChart"></canvas></div>
+              </div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <div class="text-xl font-bold text-white flex items-center gap-2">
+                      <span id="paAvgWeekly">0.0</span>
+                      <span class="text-xs text-green-500 font-bold">↑</span>
+                    </div>
+                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на тиждень (в сер.)</div>
+                  </div>
+                  <div class="flex gap-3 text-xs font-bold">
+                    <span class="flex items-center gap-1 text-gray-300">
+                      <span class="w-2.5 h-2.5 rounded-full bg-white"></span>
+                      Матчі
+                    </span>
+                    <span class="flex items-center gap-1 text-green-500">
+                      <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                      Перемоги
+                    </span>
+                  </div>
+                </div>
+                <div class="h-32"><canvas id="weeklyActivityChart"></canvas></div>
+              </div>
+            </div>
+
+            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-hidden">
+              <h3 class="text-base font-bold text-white mb-6">Графік активності</h3>
+              <div class="overflow-x-auto scrollbar-hide pb-4">
+                <div class="flex gap-4" style="min-width: 800px">
+                  <div class="flex flex-col text-[10px] text-gray-500 font-bold">
+                    <div class="mb-2 pb-1 opacity-0 text-[10px]">Місяць</div>
+                    <div class="grid grid-rows-7 gap-1 md:gap-1.5">
+                      <div class="h-3 md:h-3.5 flex items-center">П</div>
+                      <div class="h-3 md:h-3.5 flex items-center">В</div>
+                      <div class="h-3 md:h-3.5 flex items-center">С</div>
+                      <div class="h-3 md:h-3.5 flex items-center">Ч</div>
+                      <div class="h-3 md:h-3.5 flex items-center">П</div>
+                      <div class="h-3 md:h-3.5 flex items-center">С</div>
+                      <div class="h-3 md:h-3.5 flex items-center">Н</div>
+                    </div>
+                  </div>
+                  <div id="heatmapGrid" class="flex flex-1 justify-between gap-4 w-full"></div>
+                </div>
+              </div>
+              <div class="flex gap-4 items-center mt-4 text-xs font-bold text-gray-500">
+                <span>Зіграно матчів</span>
+                <span class="flex items-center gap-1">
+                  <span class="w-3 h-3 rounded-sm bg-[#d946ef]"></span>
+                  Багато
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="w-3 h-3 rounded-sm bg-[#a21caf]"></span>
+                  Середньо
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="w-3 h-3 rounded-sm bg-[#6b21a8]"></span>
+                  Мало
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="w-3 h-3 rounded-sm bg-[#18181b] border border-gray-800"></span>
+                  Немає
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div id="tab-analytics" class="hidden mt-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Ігровий профіль</h3>
+                    <div id="playstyleRoleText" class="text-2xl font-bold text-indigo-400">Аналізуємо...</div>
+                  </div>
+                  <div class="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                    <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                  </div>
+                </div>
+                <div class="flex-grow flex items-center justify-center min-h-[250px]">
+                  <canvas id="playstyleRadarChart"></canvas>
+                </div>
+              </div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Стабільність (K/D)</h3>
+                    <div id="stabilityStatusText" class="text-2xl font-bold text-white">Аналізуємо...</div>
+                  </div>
+                  <div class="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
+                    <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+                  </div>
+                </div>
+                <div class="flex-grow flex flex-col items-center justify-center min-h-[250px] relative">
+                  <canvas id="stabilityGaugeChart"></canvas>
+                  <div class="absolute bottom-8 flex flex-col items-center">
+                    <span id="stabilityScoreText" class="text-4xl font-black text-white">0%</span>
+                    <span class="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Індекс</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Кластеризація Імпакту (K-Means)</h3>
+                    <div id="clusterSummaryText" class="text-sm text-gray-400 mt-2">Аналізуємо патерни...</div>
+                  </div>
+                  <div class="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                    <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                  </div>
+                </div>
+                <div class="flex-grow w-full min-h-[300px]">
+                  <canvas id="clusterChart"></canvas>
+                </div>
+              </div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Умови перемоги (Win Conditions)</h3>
+                    <div class="text-sm text-gray-400 mt-1">Як ваші дії впливають на шанси виграти матч</div>
+                  </div>
+                  <div class="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                    <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                  </div>
+                </div>
+                <div id="winConditionsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+              </div>
+
+              <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
+                <div class="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Прогноз Elo</h3>
+                    <div class="flex items-center gap-3">
+                      <div id="predictedEloText" class="text-3xl font-bold text-white flex items-center gap-2">0</div>
+                      <div id="eloTrendText" class="text-sm font-bold bg-gray-800 px-2 py-1 rounded">-</div>
+                    </div>
+                  </div>
+                  <div class="p-2 bg-faceit/10 rounded-lg border border-faceit/20">
+                    <svg class="w-6 h-6 text-faceit" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                  </div>
+                </div>
+                <div class="flex-grow w-full min-h-[250px]">
+                  <canvas id="eloPredictionChart"></canvas>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-
-        <div id="tab-analytics" class="hidden mt-6">
-          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Ігровий профіль</h3>
-                  <div id="playstyleRoleText" class="text-2xl font-bold text-indigo-400">Аналізуємо...</div>
-                </div>
-                <div class="p-2 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
-                  <svg class="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                </div>
-              </div>
-              <div class="flex-grow flex items-center justify-center min-h-[250px]">
-                <canvas id="playstyleRadarChart"></canvas>
-              </div>
-            </div>
-
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Стабільність (K/D)</h3>
-                  <div id="stabilityStatusText" class="text-2xl font-bold text-white">Аналізуємо...</div>
-                </div>
-                <div class="p-2 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
-                  <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
-                </div>
-              </div>
-              <div class="flex-grow flex flex-col items-center justify-center min-h-[250px] relative">
-                <canvas id="stabilityGaugeChart"></canvas>
-                <div class="absolute bottom-8 flex flex-col items-center">
-                  <span id="stabilityScoreText" class="text-4xl font-black text-white">0%</span>
-                  <span class="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Індекс</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Кластеризація Імпакту (K-Means)</h3>
-                  <div id="clusterSummaryText" class="text-sm text-gray-400 mt-2">Аналізуємо патерни...</div>
-                </div>
-                <div class="p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <svg class="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                </div>
-              </div>
-              <div class="flex-grow w-full min-h-[300px]">
-                <canvas id="clusterChart"></canvas>
-              </div>
-            </div>
-
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Умови перемоги (Win Conditions)</h3>
-                  <div class="text-sm text-gray-400 mt-1">Як ваші дії впливають на шанси виграти матч</div>
-                </div>
-                <div class="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                </div>
-              </div>
-              <div id="winConditionsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
-            </div>
-
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col lg:col-span-2">
-              <div class="flex justify-between items-start mb-6">
-                <div>
-                  <h3 class="text-gray-400 text-sm font-bold uppercase tracking-wider mb-1">Прогноз Elo</h3>
-                  <div class="flex items-center gap-3">
-                    <div id="predictedEloText" class="text-3xl font-bold text-white flex items-center gap-2">0</div>
-                    <div id="eloTrendText" class="text-sm font-bold bg-gray-800 px-2 py-1 rounded">-</div>
-                  </div>
-                </div>
-                <div class="p-2 bg-faceit/10 rounded-lg border border-faceit/20">
-                  <svg class="w-6 h-6 text-faceit" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                </div>
-              </div>
-              <div class="flex-grow w-full min-h-[250px]">
-                <canvas id="eloPredictionChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
-        <footer class="mt-12 border-t border-gray-800/60 pt-6 pb-2 flex flex-col md:flex-row justify-between items-center gap-4">
+        <footer id="appFooter" class="hidden shrink-0 w-full mt-12 border-t border-gray-800/60 pt-6 pb-2 flex flex-col md:flex-row justify-between items-center gap-4">
           <div class="text-xs text-gray-500 font-medium">© 2026 CS2 Analytics. Powered by Faceit API.</div>
           <div class="flex gap-4 text-xs font-bold text-gray-600">
             <a href="https://github.com/xhanjo/gaming-stats-dashboard" target="_blank" class="hover:text-white transition-colors">GitHub</a>
@@ -497,6 +494,6 @@
         </footer>
       </div>
     </div>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
