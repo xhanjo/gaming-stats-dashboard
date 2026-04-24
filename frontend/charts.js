@@ -427,7 +427,6 @@ function analyticsTooltipHandler(context, config) {
         score = m.score ? m.score.replace(' / ', ':') : '-:-';
         isWin = (m.Result === "1" || m.Win === "true" || m.win === "1");
 
-        // 🔥 ТОЧКОВИЙ ФІКС: Зменшили розмір шрифту та товщину для довгої назви кластера 🔥
         metricsHtml = `
             <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">K/D</span><span class="text-white font-black text-base tracking-wide">${pt.x.toFixed(2)}</span></div>
             <div class="flex justify-between items-center mb-1"><span class="text-gray-500 uppercase font-bold text-xs">ADR</span><span class="text-white font-black text-base tracking-wide">${pt.y.toFixed(1)}</span></div>

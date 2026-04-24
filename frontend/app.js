@@ -526,42 +526,29 @@ function renderAnalytics(recentForm, currentElo, matches) {
         return { x: k / d, y: adr, rawMatch: m };
     });
 
-    let centroids = [
-        { x: 0.5, y: 50 },  
-        { x: 1.0, y: 75 },  
-        { x: 1.5, y: 100 }  
-    ];
+    const anchorCarry = { x: 1.35, y: 90 };
+    const anchorMid   = { x: 1.00, y: 70 };
+    const anchorLow   = { x: 0.65, y: 50 };
 
-    for (let iter = 0; iter < 10; iter++) {
-        let clusters = [[], [], []];
-        
-        clusterData.forEach(point => {
-            let distances = centroids.map(c => 
-                Math.pow((point.x - c.x) * 50, 2) + Math.pow(point.y - c.y, 2)
-            );
-            let minIndex = distances.indexOf(Math.min(...distances));
-            point.cluster = minIndex;
-            clusters[minIndex].push(point);
-        });
+    let starPts = [], midPts = [], lowPts = [];
 
-        centroids = clusters.map((cluster, i) => {
-            if (cluster.length === 0) return centroids[i];
-            let sumX = cluster.reduce((sum, p) => sum + p.x, 0);
-            let sumY = cluster.reduce((sum, p) => sum + p.y, 0);
-            return { x: sumX / cluster.length, y: sumY / cluster.length };
-        });
-    }
+    clusterData.forEach(point => {
+        let kd = point.x;
+        let adr = point.y;
 
-    centroids.forEach((c, i) => c.originalIndex = i);
-    centroids.sort((a, b) => (b.x * 50 + b.y) - (a.x * 50 + a.y));
-    
-    let starClusterId = centroids[0].originalIndex;
-    let midClusterId = centroids[1].originalIndex;
-    let lowClusterId = centroids[2].originalIndex;
-
-    let starPts = clusterData.filter(p => p.cluster === starClusterId);
-    let midPts = clusterData.filter(p => p.cluster === midClusterId);
-    let lowPts = clusterData.filter(p => p.cluster === lowClusterId);
+        if ((kd >= 1.15 && adr >= 90) || kd >= 1.3) {
+            point.cluster = 0;
+            starPts.push(point);
+        } 
+        else if ((kd < 0.95 && adr < 65) || adr < 55) {
+            point.cluster = 2;
+            lowPts.push(point);
+        } 
+        else {
+            point.cluster = 1;
+            midPts.push(point);
+        }
+    });
 
     let starPct = Math.round((starPts.length / validMatches) * 100);
     let midPct = Math.round((midPts.length / validMatches) * 100);
