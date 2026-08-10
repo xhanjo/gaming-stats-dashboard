@@ -43,10 +43,26 @@ func main() {
 
 	r := chi.NewRouter()
 
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
+			if req.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+			next.ServeHTTP(w, req)
+		})
+	})
+
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
 	r.Get("/api/player/{nickname}", handlers.GetPlayerStats(db, apiKey))
+
+	fs := http.FileServer(http.Dir("./frontend"))
+	r.Handle("/*", http.StripPrefix("/", fs))
 
 	srv := &http.Server{
 		Addr:    port,
