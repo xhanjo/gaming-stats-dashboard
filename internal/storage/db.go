@@ -1,13 +1,17 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 	_ "modernc.org/sqlite"
 )
+
+const maxHistorySize = 1000
 
 type Storage struct {
 	db *sql.DB
@@ -16,10 +20,27 @@ type Storage struct {
 func New(dbPath string) (*Storage, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+
+	// Обов'язкові PRAGMA для конкурентного доступу
+	pragmas := []string{
+		"PRAGMA journal_mode=WAL",
+		"PRAGMA busy_timeout=5000",
+		"PRAGMA synchronous=NORMAL",
+		"PRAGMA foreign_keys=ON",
+	}
+	for _, p := range pragmas {
+		if _, err := db.Exec(p); err != nil {
+			return nil, fmt.Errorf("exec %q: %w", p, err)
+		}
+	}
+
+	// SQLite краще працює з одним writer з'єднанням
+	db.SetMaxOpenConns(1)
+
 	if err := db.Ping(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 	return &Storage{db: db}, nil
 }
@@ -28,7 +49,7 @@ func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
-func (s *Storage) InitTable() error {
+func (s *Storage) InitTable(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS players (
 		player_id TEXT PRIMARY KEY,
@@ -53,17 +74,16 @@ func (s *Storage) InitTable() error {
 		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	_, err := s.db.Exec(query)
-	if err != nil {
-		return fmt.Errorf("помилка створення таблиці: %v", err)
+	if _, err := s.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("create table: %w", err)
 	}
 	return nil
 }
 
-func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
+func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile) error {
 	cs2Stats, ok := profile.Games["cs2"]
 	if !ok {
-		return fmt.Errorf("гравець %s не має статистики CS2", profile.Nickname)
+		return fmt.Errorf("player %s has no CS2 stats", profile.Nickname)
 	}
 
 	kd, winrate, matches := "", "", ""
@@ -73,12 +93,23 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		kd = profile.Stats.Lifetime.AverageKD
 		winrate = profile.Stats.Lifetime.WinRate
 		matches = profile.Stats.Lifetime.Matches
-		mapStatsJSON, _ = json.Marshal(profile.Stats.Segments)
+		var marshalErr error
+		mapStatsJSON, marshalErr = json.Marshal(profile.Stats.Segments)
+		if marshalErr != nil {
+			return fmt.Errorf("marshal map stats: %w", marshalErr)
+		}
 	}
 
 	var rMatches, rEntry, rSniper int
 	var rKills, rADR, rHS, rKR float64
 	var historyJSON []byte
+
+	// F11: Атомарний read-modify-write через транзакцію
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
 
 	if profile.Recent != nil {
 		rMatches = profile.Recent.MatchesAnalyzed
@@ -90,17 +121,19 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		rSniper = profile.Recent.TotalSniperKills
 
 		var oldHistoryText string
-		err := s.db.QueryRow("SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
-
-		if err != nil && err != sql.ErrNoRows {
-			return fmt.Errorf("помилка читання історії з БД під час оновлення: %v", err)
+		readErr := tx.QueryRowContext(ctx, "SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
+		if readErr != nil && readErr != sql.ErrNoRows {
+			return fmt.Errorf("read history: %w", readErr)
 		}
 
 		var combinedHistory []faceit.PlayerMatchStats
 		existingMatches := make(map[string]bool)
 
 		if oldHistoryText != "" {
-			json.Unmarshal([]byte(oldHistoryText), &combinedHistory)
+			if unmarshalErr := json.Unmarshal([]byte(oldHistoryText), &combinedHistory); unmarshalErr != nil {
+				log.Printf("WARN: corrupt recent_history for %s: %v", profile.Nickname, unmarshalErr)
+				combinedHistory = nil
+			}
 			for _, m := range combinedHistory {
 				if m.MatchId != "" {
 					existingMatches[m.MatchId] = true
@@ -120,12 +153,16 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 
 		finalHistory := append(newMatches, combinedHistory...)
 
-		if len(finalHistory) > 1000 {
-			finalHistory = finalHistory[:1000]
+		if len(finalHistory) > maxHistorySize {
+			finalHistory = finalHistory[:maxHistorySize]
 		}
 
 		profile.Recent.MatchHistory = finalHistory
-		historyJSON, _ = json.Marshal(finalHistory)
+		var marshalErr error
+		historyJSON, marshalErr = json.Marshal(finalHistory)
+		if marshalErr != nil {
+			return fmt.Errorf("marshal history: %w", marshalErr)
+		}
 	}
 
 	query := `
@@ -140,21 +177,25 @@ func (s *Storage) SavePlayer(profile *faceit.PlayerProfile) error {
 		recent_matches_analyzed = excluded.recent_matches_analyzed, recent_avg_kills = excluded.recent_avg_kills,
 		recent_avg_adr = excluded.recent_avg_adr, recent_avg_hs = excluded.recent_avg_hs, recent_avg_kr = excluded.recent_avg_kr,
 		recent_total_entry = excluded.recent_total_entry, recent_total_sniper = excluded.recent_total_sniper,
-		recent_history = excluded.recent_history, 
+		recent_history = excluded.recent_history,
 		last_updated = CURRENT_TIMESTAMP;`
 
-	_, err := s.db.Exec(query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches, string(mapStatsJSON),
+	_, err = tx.ExecContext(ctx, query, profile.PlayerID, profile.Nickname, profile.Avatar, profile.Country, profile.SteamID, cs2Stats.SkillLevel, cs2Stats.FaceitElo, kd, winrate, matches, string(mapStatsJSON),
 		rMatches, rKills, rADR, rHS, rKR, rEntry, rSniper, string(historyJSON))
-	return err
+	if err != nil {
+		return fmt.Errorf("upsert player: %w", err)
+	}
+
+	return tx.Commit()
 }
 
-func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
+func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.PlayerProfile, error) {
 	query := `
 	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches, map_stats,
 		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
 	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
 
-	row := s.db.QueryRow(query, nickname)
+	row := s.db.QueryRowContext(ctx, query, nickname)
 
 	var p faceit.PlayerProfile
 	var cs2Level, cs2Elo int
@@ -173,7 +214,9 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 
 	var segments []faceit.Segment
 	if mapStatsText != "" {
-		json.Unmarshal([]byte(mapStatsText), &segments)
+		if unmarshalErr := json.Unmarshal([]byte(mapStatsText), &segments); unmarshalErr != nil {
+			log.Printf("WARN: corrupt map_stats for %s: %v", p.Nickname, unmarshalErr)
+		}
 	}
 	p.Stats = &faceit.CS2Stats{
 		Lifetime: faceit.LifetimeStats{AverageKD: kd, WinRate: winrate, Matches: matches},
@@ -183,12 +226,19 @@ func (s *Storage) GetPlayer(nickname string) (*faceit.PlayerProfile, error) {
 	if rMatches > 0 {
 		var matchHistory []faceit.PlayerMatchStats
 		if historyText != "" {
-			json.Unmarshal([]byte(historyText), &matchHistory)
+			if unmarshalErr := json.Unmarshal([]byte(historyText), &matchHistory); unmarshalErr != nil {
+				log.Printf("WARN: corrupt recent_history for %s: %v", p.Nickname, unmarshalErr)
+			}
 		}
-		p.Recent = &faceit.RecentForm{
-			MatchesAnalyzed: rMatches, AvgKills: rKills, AvgADR: rADR,
-			AvgHSPercentage: rHS, AvgKRRatio: rKR, TotalEntryKills: rEntry, TotalSniperKills: rSniper,
-			MatchHistory: matchHistory,
+		if len(matchHistory) > 0 {
+			p.Recent = faceit.CalculateStatsFromHistory(matchHistory, cs2Elo)
+		}
+		if p.Recent == nil {
+			p.Recent = &faceit.RecentForm{
+				MatchesAnalyzed: rMatches, AvgKills: rKills, AvgADR: rADR,
+				AvgHSPercentage: rHS, AvgKRRatio: rKR, TotalEntryKills: rEntry, TotalSniperKills: rSniper,
+				MatchHistory: matchHistory,
+			}
 		}
 	}
 
