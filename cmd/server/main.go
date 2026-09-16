@@ -33,13 +33,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := db.InitTable(); err != nil {
+	if err := db.InitTable(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 
 	log.Println("INFO: База даних SQLite успішно підключена!")
 
-	port := ":8080"
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":8080"
+	} else if port[0] != ':' {
+		port = ":" + port
+	}
 
 	r := chi.NewRouter()
 
@@ -82,7 +87,7 @@ func main() {
 	<-stopChan
 	log.Println("\nОтримано сигнал зупинки (Ctrl+C). Починаємо Graceful Shutdown...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {

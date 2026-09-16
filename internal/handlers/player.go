@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -13,13 +14,17 @@ import (
 )
 
 type Database interface {
-	GetPlayer(nickname string) (*faceit.PlayerProfile, error)
-	SavePlayer(profile *faceit.PlayerProfile) error
+	GetPlayer(ctx context.Context, nickname string) (*faceit.PlayerProfile, error)
+	SavePlayer(ctx context.Context, profile *faceit.PlayerProfile) error
 }
+
+const (
+	defaultMatchLimit = 30
+	maxMatchLimit     = 200
+)
 
 func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
 
 		ctx := r.Context()
@@ -32,20 +37,28 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 		}
 
 		limitStr := r.URL.Query().Get("limit")
-		limit := 30
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 200 {
+		limit := defaultMatchLimit
+		if limitStr != "" {
+			l, err := strconv.Atoi(limitStr)
+			if err != nil || l <= 0 || l > maxMatchLimit {
+				w.WriteHeader(http.StatusBadRequest)
+				fmt.Fprintf(w, `{"error": "Параметр limit має бути числом від 1 до %d"}`, maxMatchLimit)
+				return
+			}
 			limit = l
 		}
 
-		profile, err := db.GetPlayer(nickname)
+		profile, err := db.GetPlayer(ctx, nickname)
 
-		if err == nil && limit <= 30 && profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
+		if err == nil && limit <= defaultMatchLimit && profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
 			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
-			json.NewEncoder(w).Encode(profile)
+			if encErr := json.NewEncoder(w).Encode(profile); encErr != nil {
+				log.Printf("WARN: Помилка відправки відповіді з кешу: %v", encErr)
+			}
 			return
 		}
 
-		if err != sql.ErrNoRows && limit <= 30 {
+		if err != sql.ErrNoRows && limit <= defaultMatchLimit {
 			log.Printf("ERROR: Помилка читання з БД (або кеш порожній/зламаний): %v", err)
 		}
 
@@ -84,7 +97,7 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 		}
 
 		if profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
-			err = db.SavePlayer(profile)
+			err = db.SavePlayer(ctx, profile)
 			if err != nil {
 				log.Printf("ERROR: Помилка збереження в БД: %v", err)
 			} else {
@@ -94,6 +107,8 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			log.Printf("WARN: Дані не збережено в БД, оскільки історія матчів порожня")
 		}
 
-		json.NewEncoder(w).Encode(profile)
+		if err := json.NewEncoder(w).Encode(profile); err != nil {
+			log.Printf("WARN: Помилка відправки відповіді: %v", err)
+		}
 	}
 }
