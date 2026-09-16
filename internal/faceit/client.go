@@ -98,45 +98,81 @@ type PlayerMatchStats struct {
 }
 
 type RecentForm struct {
-	MatchesAnalyzed  int                `json:"matches_analyzed"`
-	AvgKills         float64            `json:"avg_kills"`
-	AvgADR           float64            `json:"avg_adr"`
-	AvgHSPercentage  float64            `json:"avg_hs_percentage"`
-	AvgKRRatio       float64            `json:"avg_kr_ratio"`
-	TotalEntryKills  int                `json:"total_entry_kills"`
-	TotalSniperKills int                `json:"total_sniper_kills"`
-	PlaystyleRole    string             `json:"playstyle_role"`
-	PredictedElo     int                `json:"predicted_elo"`
-	EloTrend         float64            `json:"elo_trend"`
-	MatchHistory     []PlayerMatchStats `json:"match_history"`
+	MatchesAnalyzed  int                 `json:"matches_analyzed"`
+	AvgKills         float64             `json:"avg_kills"`
+	AvgADR           float64             `json:"avg_adr"`
+	AvgHSPercentage  float64             `json:"avg_hs_percentage"`
+	AvgKRRatio       float64             `json:"avg_kr_ratio"`
+	TotalEntryKills  int                 `json:"total_entry_kills"`
+	TotalSniperKills int                 `json:"total_sniper_kills"`
+	PlaystyleRole    string              `json:"playstyle_role"`
+	PredictedElo     int                 `json:"predicted_elo"`
+	EloTrend         float64             `json:"elo_trend"`
+	Analytics        *AnalyticsReport    `json:"analytics,omitempty"`
+	Activity         *PlayActivityReport `json:"activity,omitempty"`
+	MatchHistory     []PlayerMatchStats  `json:"match_history"`
 }
 
+const (
+	httpClientTimeout     = 10 * time.Second
+	maxRetries            = 3
+	retryBaseWait         = 500 * time.Millisecond
+	matchHistoryBatchSize = 100
+	batchDelay            = 200 * time.Millisecond
+	numWorkers            = 5
+	workerThrottle        = 150 * time.Millisecond
+	eloChangePerMatch     = 25
+)
+
 var httpClient = &http.Client{
-	Timeout: 10 * time.Second,
+	Timeout: httpClientTimeout,
+}
+
+// doFaceitRequest виконує GET-запит до FACEIT API з retry та exponential backoff для 429.
+func doFaceitRequest(ctx context.Context, url, apiKey string, result interface{}) error {
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return fmt.Errorf("create request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("http request: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			if attempt == maxRetries {
+				return fmt.Errorf("FACEIT API rate limited after %d retries", maxRetries)
+			}
+			wait := retryBaseWait * time.Duration(1<<attempt)
+			select {
+			case <-time.After(wait):
+				continue
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return fmt.Errorf("FACEIT API: status %d", resp.StatusCode)
+		}
+
+		defer resp.Body.Close()
+		return json.NewDecoder(resp.Body).Decode(result)
+	}
+	return fmt.Errorf("FACEIT API: exhausted retries")
 }
 
 func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProfile, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players?nickname=%s", nickname)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Authorization", "Bearer "+apiKey)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("помилка API Faceit: статус %d", resp.StatusCode)
-	}
-
 	var profile PlayerProfile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		return nil, err
+	if err := doFaceitRequest(ctx, url, apiKey, &profile); err != nil {
+		return nil, fmt.Errorf("get player profile: %w", err)
 	}
 	return &profile, nil
 }
@@ -144,70 +180,39 @@ func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProf
 func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/stats/cs2", playerID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Authorization", "Bearer "+apiKey)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("помилка отримання статистики: статус %d", resp.StatusCode)
-	}
-
 	var stats CS2Stats
-	if err := json.NewDecoder(resp.Body).Decode(&stats); err != nil {
-		return nil, err
+	if err := doFaceitRequest(ctx, url, apiKey, &stats); err != nil {
+		return nil, fmt.Errorf("get cs2 stats: %w", err)
 	}
 	return &stats, nil
 }
 
 func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
 	var allItems []MatchHistoryItem
-	batchSize := 100
 
-	for offset := 0; offset < limit; offset += batchSize {
+	for offset := 0; offset < limit; offset += matchHistoryBatchSize {
 		if offset > 0 {
-			time.Sleep(200 * time.Millisecond)
+			select {
+			case <-time.After(batchDelay):
+			case <-ctx.Done():
+				return allItems, ctx.Err()
+			}
 		}
 
-		fetchSize := batchSize
-		if limit-offset < batchSize {
+		fetchSize := matchHistoryBatchSize
+		if limit-offset < matchHistoryBatchSize {
 			fetchSize = limit - offset
 		}
 
 		url := fmt.Sprintf("https://open.faceit.com/data/v4/players/%s/history?game=cs2&offset=%d&limit=%d", playerID, offset, fetchSize)
 
-		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Add("Authorization", "Bearer "+apiKey)
-
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			if len(allItems) > 0 {
-				break
-			}
-			return nil, fmt.Errorf("помилка отримання історії матчів: статус %d", resp.StatusCode)
-		}
-
 		var historyResponse MatchHistoryResponse
-		if err := json.NewDecoder(resp.Body).Decode(&historyResponse); err != nil {
-			resp.Body.Close()
-			return nil, err
+		if err := doFaceitRequest(ctx, url, apiKey, &historyResponse); err != nil {
+			if len(allItems) > 0 {
+				break // повертаємо часткові результати
+			}
+			return nil, fmt.Errorf("match history: %w", err)
 		}
-		resp.Body.Close()
 
 		allItems = append(allItems, historyResponse.Items...)
 
@@ -222,25 +227,9 @@ func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit i
 func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
 	url := fmt.Sprintf("https://open.faceit.com/data/v4/matches/%s/stats", matchID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Add("Authorization", "Bearer "+apiKey)
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("помилка матчу %s: статус %d", matchID, resp.StatusCode)
-	}
-
 	var matchResp MatchStatsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&matchResp); err != nil {
-		return nil, err
+	if err := doFaceitRequest(ctx, url, apiKey, &matchResp); err != nil {
+		return nil, fmt.Errorf("match %s: %w", matchID, err)
 	}
 
 	if len(matchResp.Rounds) == 0 {
@@ -296,9 +285,9 @@ func CalculateEloRegression(currentElo int, matches []PlayerMatchStats) (float64
 		isWin := res == "1" || res == "true"
 
 		if isWin {
-			current -= 25
+			current -= eloChangePerMatch
 		} else {
-			current += 25
+			current += eloChangePerMatch
 		}
 	}
 
@@ -355,10 +344,15 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 		}
 
 		// Рахуємо мультикіли для Опорника
-		triples, _ := strconv.Atoi(stats.TripleKills)
-		quadros, _ := strconv.Atoi(stats.QuadroKills)
-		pentas, _ := strconv.Atoi(stats.PentaKills)
-		totalMulti += (triples + quadros + pentas)
+		if val, err := strconv.Atoi(stats.TripleKills); err == nil {
+			totalMulti += val
+		}
+		if val, err := strconv.Atoi(stats.QuadroKills); err == nil {
+			totalMulti += val
+		}
+		if val, err := strconv.Atoi(stats.PentaKills); err == nil {
+			totalMulti += val
+		}
 	}
 
 	avgSniper := float64(totalSniper) / float64(successfulMatches)
@@ -372,6 +366,9 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 
 	trendM, predictedElo := CalculateEloRegression(currentElo, formHistory)
 
+	analytics := CalculateAnalytics(formHistory, currentElo, role, avgSniper, avgEntry, avgAssists, avgADR, avgHS, avgMulti)
+	activity := CalculatePlayActivity(formHistory)
+
 	return &RecentForm{
 		MatchesAnalyzed:  successfulMatches,
 		AvgKills:         totalKills / float64(successfulMatches),
@@ -383,6 +380,8 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 		PlaystyleRole:    role,
 		PredictedElo:     predictedElo,
 		EloTrend:         trendM,
+		Analytics:        analytics,
+		Activity:         activity,
 		MatchHistory:     formHistory,
 	}
 }
@@ -411,14 +410,20 @@ func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int
 	results := make(chan matchResult, len(matchItems))
 
 	var wg sync.WaitGroup
-	const numWorkers = 5
 
 	for w := 1; w <= numWorkers; w++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for job := range jobs {
-				time.Sleep(150 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					results <- matchResult{index: job.index, err: ctx.Err()}
+					continue
+				default:
+				}
+
+				time.Sleep(workerThrottle)
 
 				stats, err := GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID, apiKey)
 
