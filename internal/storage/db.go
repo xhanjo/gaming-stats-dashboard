@@ -6,12 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 	_ "modernc.org/sqlite"
 )
 
-const maxHistorySize = 1000
+const maxHistorySize = faceit.MaxHistorySize
 
 type Storage struct {
 	db *sql.DB
@@ -151,13 +152,28 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 			}
 		}
 
-		finalHistory := append(newMatches, combinedHistory...)
+		finalHistory := make([]faceit.PlayerMatchStats, 0, len(newMatches)+len(combinedHistory))
+		finalHistory = append(finalHistory, newMatches...)
+		finalHistory = append(finalHistory, combinedHistory...)
 
 		if len(finalHistory) > maxHistorySize {
 			finalHistory = finalHistory[:maxHistorySize]
 		}
 
-		profile.Recent.MatchHistory = finalHistory
+		if len(finalHistory) > 0 {
+			profile.Recent = faceit.CalculateStatsFromHistory(finalHistory, cs2Stats.FaceitElo)
+		}
+
+		if profile.Recent != nil {
+			rMatches = profile.Recent.MatchesAnalyzed
+			rKills = profile.Recent.AvgKills
+			rADR = profile.Recent.AvgADR
+			rHS = profile.Recent.AvgHSPercentage
+			rKR = profile.Recent.AvgKRRatio
+			rEntry = profile.Recent.TotalEntryKills
+			rSniper = profile.Recent.TotalSniperKills
+		}
+
 		var marshalErr error
 		historyJSON, marshalErr = json.Marshal(finalHistory)
 		if marshalErr != nil {
@@ -186,14 +202,19 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 		return fmt.Errorf("upsert player: %w", err)
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit player: %w", err)
+	}
+	profile.LastUpdated = time.Now().UTC()
+	return nil
 }
 
 func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.PlayerProfile, error) {
 	query := `
 	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches, map_stats,
-		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history
-	FROM players WHERE nickname = ? AND last_updated >= datetime('now', '-1 hour')`
+		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history,
+		last_updated
+	FROM players WHERE nickname = ? COLLATE NOCASE`
 
 	row := s.db.QueryRowContext(ctx, query, nickname)
 
@@ -203,11 +224,21 @@ func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.Playe
 	var rMatches, rEntry, rSniper int
 	var rKills, rADR, rHS, rKR float64
 	var historyText string
+	var lastUpdatedStr sql.NullString
 
 	err := row.Scan(&p.PlayerID, &p.Nickname, &p.Avatar, &p.Country, &p.SteamID, &cs2Level, &cs2Elo, &kd, &winrate, &matches, &mapStatsText,
-		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText)
+		&rMatches, &rKills, &rADR, &rHS, &rKR, &rEntry, &rSniper, &historyText, &lastUpdatedStr)
 	if err != nil {
 		return nil, err
+	}
+
+	if lastUpdatedStr.Valid && lastUpdatedStr.String != "" {
+		for _, layout := range []string{"2006-01-02 15:04:05", time.RFC3339, "2006-01-02T15:04:05Z"} {
+			if t, parseErr := time.Parse(layout, lastUpdatedStr.String); parseErr == nil {
+				p.LastUpdated = t
+				break
+			}
+		}
 	}
 
 	p.Games = map[string]faceit.GameInfo{"cs2": {SkillLevel: cs2Level, FaceitElo: cs2Elo}}
@@ -223,7 +254,7 @@ func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.Playe
 		Segments: segments,
 	}
 
-	if rMatches > 0 {
+	if rMatches > 0 || historyText != "" {
 		var matchHistory []faceit.PlayerMatchStats
 		if historyText != "" {
 			if unmarshalErr := json.Unmarshal([]byte(historyText), &matchHistory); unmarshalErr != nil {
@@ -233,7 +264,7 @@ func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.Playe
 		if len(matchHistory) > 0 {
 			p.Recent = faceit.CalculateStatsFromHistory(matchHistory, cs2Elo)
 		}
-		if p.Recent == nil {
+		if p.Recent == nil && rMatches > 0 {
 			p.Recent = &faceit.RecentForm{
 				MatchesAnalyzed: rMatches, AvgKills: rKills, AvgADR: rADR,
 				AvgHSPercentage: rHS, AvgKRRatio: rKR, TotalEntryKills: rEntry, TotalSniperKills: rSniper,
