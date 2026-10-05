@@ -5,6 +5,7 @@ import (
 )
 
 func TestCalculateRecentForm_TableDriven(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name             string
 		inputHistory     []PlayerMatchStats
@@ -44,6 +45,7 @@ func TestCalculateRecentForm_TableDriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
 			// 🔥 ВИПРАВЛЕННЯ: Передаємо 2000 як фейкове поточне Elo для проходження тесту
 			result := CalculateStatsFromHistory(tt.inputHistory, 2000)
