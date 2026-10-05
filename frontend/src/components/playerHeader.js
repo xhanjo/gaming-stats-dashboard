@@ -11,6 +11,10 @@ export function renderPlayerHeader(data) {
 
     if (data.avatar) {
         const img = $('playerAvatar');
+        img.onerror = () => {
+            hide(img);
+            show('playerAvatarFallback');
+        };
         img.src = data.avatar;
         show(img);
         hide('playerAvatarFallback');
@@ -40,7 +44,10 @@ export function renderPlayerHeader(data) {
     }
 
     const lvlIcon = $('playerLevelIcon');
-    lvlIcon.dataset.lvl = lvl;
+    lvlIcon.onerror = () => {
+        lvlIcon.onerror = null;
+        lvlIcon.src = `https://cdn-frontend.faceit.com/m/master/app/assets/images/badges/skill_level_${lvl}_svg.svg`;
+    };
     lvlIcon.src = `assets/level${lvl}.svg`;
     show(lvlIcon);
     hide('playerLevelFallback');

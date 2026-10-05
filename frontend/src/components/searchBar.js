@@ -149,7 +149,7 @@ export function renderSearchHistory() {
         btn.type = 'button';
         btn.dataset.name = name;
         btn.textContent = name;
-        btn.className = 'history-tag text-xs font-bold text-gray-500 border border-gray-800 px-3 py-1 rounded-full transition-all cursor-pointer';
+        btn.className = 'history-tag text-xs font-bold text-gray-500 border border-gray-800 px-3 py-1 rounded-full transition-all cursor-pointer hover:bg-faceit/20 hover:border-faceit';
         container.appendChild(btn);
     });
 }

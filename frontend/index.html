@@ -7,7 +7,9 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     <script>
-      tailwind.config = {
+      /** @type {any} */
+      window.tailwind = window.tailwind || {};
+      window.tailwind.config = {
         theme: {
           extend: {
             colors: { faceit: "#ff5500", dark: "#121212", card: "#1e1e1e" },
@@ -30,10 +32,6 @@
         100% {
           transform: rotate(360deg);
         }
-      }
-      .history-tag:hover {
-        background-color: rgba(255, 85, 0, 0.2);
-        border-color: #ff5500;
       }
       .scrollbar-hide::-webkit-scrollbar {
         display: none;
@@ -93,10 +91,11 @@
 
           <div class="w-full md:w-auto">
             <div class="flex shadow-lg rounded-lg overflow-hidden border border-gray-800 bg-card">
-              <input type="text" id="nicknameInput" placeholder="Нікнейм на Faceit..." class="w-full md:w-72 bg-transparent text-white px-4 py-3 outline-none focus:bg-gray-800 transition-colors" />
+              <label for="nicknameInput" class="sr-only">Нікнейм на Faceit</label>
+              <input type="text" id="nicknameInput" aria-label="Нікнейм на Faceit" placeholder="Нікнейм на Faceit..." class="w-full md:w-72 bg-transparent text-white px-4 py-3 outline-none focus:bg-gray-800 transition-colors" />
               <button type="button" id="searchBtn" class="bg-faceit hover:bg-orange-600 text-white font-semibold px-6 py-3 transition-colors flex items-center gap-2">
                 <span id="btnText">Знайти</span>
-                <div id="btnSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                <span id="btnSpinner" class="hidden inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
               </button>
             </div>
             <div id="searchHistory" class="flex gap-2 mt-3 flex-wrap justify-center md:justify-start"></div>
@@ -115,11 +114,8 @@
             <div class="flex items-center gap-5">
               <img
                 id="playerAvatar"
-                src=""
-                onerror="
-                  this.classList.add('hidden');
-                  document.getElementById('playerAvatarFallback').classList.remove('hidden');
-                "
+                src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
+                alt="Аватар гравця"
                 class="w-20 h-20 rounded-full border-2 border-gray-700 object-cover hidden shadow-lg" />
               <div id="playerAvatarFallback" class="w-20 h-20 rounded-full border-2 border-gray-700 bg-[#141414] flex items-center justify-center shadow-inner">
                 <svg class="w-12 h-12 text-gray-700" fill="currentColor" viewBox="0 0 24 24">
@@ -131,14 +127,14 @@
               <div class="flex flex-col">
                 <div class="flex items-center gap-3 mb-2">
                   <h2 id="playerName" class="text-3xl font-bold text-white tracking-wide">-</h2>
-                  <img id="playerFlag" src="" class="w-6 h-4 rounded-sm hidden shadow-sm cursor-help" />
+                  <img id="playerFlag" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E" alt="Прапор країни" class="w-6 h-4 rounded-sm hidden shadow-sm cursor-help" />
                 </div>
                 <div class="flex gap-3">
                   <a id="linkFaceit" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
-                    <img src="assets/faceit.svg" class="w-full h-full object-contain" />
+                    <img src="assets/faceit.svg" alt="FACEIT профіль" class="w-full h-full object-contain" />
                   </a>
                   <a id="linkSteam" href="#" target="_blank" class="w-8 h-8 hover:scale-110 transition-transform">
-                    <img src="assets/steam.svg" class="w-full h-full object-contain" />
+                    <img src="assets/steam.svg" alt="Steam профіль" class="w-full h-full object-contain" />
                   </a>
                 </div>
               </div>
@@ -152,12 +148,8 @@
               <div class="w-16 h-16 flex items-center justify-center">
                 <img
                   id="playerLevelIcon"
-                  data-lvl=""
-                  src=""
-                  onerror="
-                    this.onerror = null;
-                    this.src = 'https://cdn-frontend.faceit.com/m/master/app/assets/images/badges/skill_level_' + this.dataset.lvl + '_svg.svg';
-                  "
+                  src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
+                  alt="Рівень FACEIT"
                   class="w-full h-full object-contain hidden pointer-events-none" />
                 <span id="playerLevelFallback" class="text-xl font-bold text-gray-500">-</span>
               </div>
@@ -409,7 +401,8 @@
 
               <!-- Нативний скрол-трек / слайдер як на FACEIT -->
               <div class="mt-4 pt-1">
-                <input type="range" id="heatmapScrollSlider" min="0" max="1000" value="1000" class="w-full h-1 bg-gray-800/80 rounded-lg appearance-none cursor-pointer" title="Прокрутка місяців">
+                <label for="heatmapScrollSlider" class="sr-only">Прокрутка місяців активності</label>
+                <input type="range" id="heatmapScrollSlider" aria-label="Прокрутка місяців активності" min="0" max="1000" value="1000" class="w-full h-1 bg-gray-800/80 rounded-lg appearance-none cursor-pointer" title="Прокрутка місяців">
               </div>
 
               <!-- Легенда за дизайном FACEIT -->
