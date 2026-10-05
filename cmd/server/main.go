@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/joho/godotenv"
 
+	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/handlers"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/storage"
 )
@@ -64,14 +65,19 @@ func main() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Get("/api/player/{nickname}", handlers.GetPlayerStats(db, apiKey))
+	faceitClient := faceit.NewClient(apiKey)
+	r.Get("/api/player/{nickname}", handlers.GetPlayerStats(db, faceitClient))
 
 	fs := http.FileServer(http.Dir("./frontend"))
 	r.Handle("/*", http.StripPrefix("/", fs))
 
 	srv := &http.Server{
-		Addr:    port,
-		Handler: r,
+		Addr:              port,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	stopChan := make(chan os.Signal, 1)

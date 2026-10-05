@@ -2,12 +2,12 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/xhanjo/gaming-stats-dashboard/internal/faceit"
@@ -18,12 +18,28 @@ type Database interface {
 	SavePlayer(ctx context.Context, profile *faceit.PlayerProfile) error
 }
 
+type FaceitService interface {
+	GetPlayerProfile(ctx context.Context, nickname string) (*faceit.PlayerProfile, error)
+	GetCS2Stats(ctx context.Context, playerID string) (*faceit.CS2Stats, error)
+	CalculateRecentForm(ctx context.Context, playerID string, limit, currentElo int) (*faceit.RecentForm, error)
+}
+
 const (
 	defaultMatchLimit = 30
 	maxMatchLimit     = 200
 )
 
-func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
+type errorResponse struct {
+	Error string `json:"error"`
+}
+
+func writeJSONError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(errorResponse{Error: message})
+}
+
+func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
@@ -31,8 +47,7 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 
 		nickname := chi.URLParam(r, "nickname")
 		if nickname == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintf(w, `{"error": "Будь ласка, вкажіть параметр nickname"}`)
+			writeJSONError(w, http.StatusBadRequest, "Будь ласка, вкажіть параметр nickname")
 			return
 		}
 
@@ -41,44 +56,54 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 		if limitStr != "" {
 			l, err := strconv.Atoi(limitStr)
 			if err != nil || l <= 0 || l > maxMatchLimit {
-				w.WriteHeader(http.StatusBadRequest)
-				fmt.Fprintf(w, `{"error": "Параметр limit має бути числом від 1 до %d"}`, maxMatchLimit)
+				writeJSONError(w, http.StatusBadRequest, fmt.Sprintf("Параметр limit має бути числом від 1 до %d", maxMatchLimit))
 				return
 			}
 			limit = l
 		}
 
-		profile, err := db.GetPlayer(ctx, nickname)
+		cachedProfile, dbErr := db.GetPlayer(ctx, nickname)
 
-		if err == nil && limit <= defaultMatchLimit && profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
-			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ", nickname)
-			if encErr := json.NewEncoder(w).Encode(profile); encErr != nil {
+		isCacheValid := dbErr == nil && cachedProfile != nil &&
+			(cachedProfile.LastUpdated.IsZero() || time.Since(cachedProfile.LastUpdated) < 1*time.Hour)
+
+		// Якщо кеш свіжий (< 1 години), історія є, і користувач не просив глибокий аналіз (> 30) - віддаємо з БД
+		if isCacheValid && limit <= defaultMatchLimit && cachedProfile.Recent != nil && len(cachedProfile.Recent.MatchHistory) > 0 {
+			log.Printf("INFO: Дані для [%s] взяті з БАЗИ ДАНИХ (%d матчів)", nickname, len(cachedProfile.Recent.MatchHistory))
+			if encErr := json.NewEncoder(w).Encode(cachedProfile); encErr != nil {
 				log.Printf("WARN: Помилка відправки відповіді з кешу: %v", encErr)
 			}
 			return
 		}
 
-		if err != sql.ErrNoRows && limit <= defaultMatchLimit {
-			log.Printf("ERROR: Помилка читання з БД (або кеш порожній/зламаний): %v", err)
-		}
-
-		if limit > 30 {
+		if limit > defaultMatchLimit {
 			log.Printf("INFO: Запущено ГЛИБОКИЙ АНАЛІЗ для [%s] (limit=%d)", nickname, limit)
+		} else if dbErr == nil && cachedProfile != nil {
+			log.Printf("INFO: Кеш застарів (останнє оновлення: %s). Оновлення нових матчів з Faceit API для [%s]...", cachedProfile.LastUpdated.Format("15:04:05"), nickname)
 		} else {
-			log.Printf("INFO: Кеш порожній або застарів. Запит до Faceit API для [%s] (limit=%d)...", nickname, limit)
+			log.Printf("INFO: Кеш порожній. Перший запит до Faceit API для [%s] (limit=%d)...", nickname, limit)
 		}
 
-		profile, err = faceit.GetPlayerProfile(ctx, nickname, apiKey)
+		profile, err := faceitSvc.GetPlayerProfile(ctx, nickname)
 		if err != nil {
 			log.Printf("CRITICAL: Помилка Faceit API: %v", err)
-			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, `{"error": "Гравця не знайдено або Faceit API заблокував запити (429)"}`)
+			// Якщо Faceit API недоступне (429/timeout), але в нас є дані в БД - віддаємо кеш як fallback!
+			if cachedProfile != nil && cachedProfile.Recent != nil && len(cachedProfile.Recent.MatchHistory) > 0 {
+				log.Printf("WARN: Повертаємо збережені дані з БД для [%s] через збій Faceit API", nickname)
+				if encErr := json.NewEncoder(w).Encode(cachedProfile); encErr != nil {
+					log.Printf("WARN: Помилка відправки fallback відповіді: %v", encErr)
+				}
+				return
+			}
+			writeJSONError(w, http.StatusInternalServerError, "Гравця не знайдено або Faceit API заблокував запити (429)")
 			return
 		}
 
-		stats, err := faceit.GetCS2Stats(ctx, profile.PlayerID, apiKey)
+		stats, err := faceitSvc.GetCS2Stats(ctx, profile.PlayerID)
 		if err == nil {
 			profile.Stats = stats
+		} else if cachedProfile != nil && cachedProfile.Stats != nil {
+			profile.Stats = cachedProfile.Stats
 		} else {
 			log.Printf("WARN: Не вдалося отримати загальну статистику: %v", err)
 		}
@@ -88,12 +113,46 @@ func GetPlayerStats(db Database, apiKey string) http.HandlerFunc {
 			currentElo = cs2Info.FaceitElo
 		}
 
-		recentForm, err := faceit.CalculateRecentForm(ctx, profile.PlayerID, apiKey, limit, currentElo)
-		if err == nil {
-			profile.Recent = recentForm
-			log.Printf("INFO: Успішно проаналізовано %d матчів", recentForm.MatchesAnalyzed)
-		} else {
+		recentForm, err := faceitSvc.CalculateRecentForm(ctx, profile.PlayerID, limit, currentElo)
+		if err != nil {
 			log.Printf("WARN: Не вдалося розрахувати форму: %v", err)
+		}
+
+		// Об'єднуємо щойно отримані матчі з тими, що вже були збережені в базі даних
+		var combinedHistory []faceit.PlayerMatchStats
+		seenMatches := make(map[string]bool)
+
+		if recentForm != nil {
+			for _, m := range recentForm.MatchHistory {
+				if m.MatchId != "" && !seenMatches[m.MatchId] {
+					seenMatches[m.MatchId] = true
+					combinedHistory = append(combinedHistory, m)
+				} else if m.MatchId == "" {
+					combinedHistory = append(combinedHistory, m)
+				}
+			}
+		}
+
+		if cachedProfile != nil && cachedProfile.Recent != nil {
+			for _, m := range cachedProfile.Recent.MatchHistory {
+				if m.MatchId != "" && !seenMatches[m.MatchId] {
+					seenMatches[m.MatchId] = true
+					combinedHistory = append(combinedHistory, m)
+				} else if m.MatchId == "" {
+					combinedHistory = append(combinedHistory, m)
+				}
+			}
+		}
+
+		if len(combinedHistory) > faceit.MaxHistorySize {
+			combinedHistory = combinedHistory[:faceit.MaxHistorySize]
+		}
+
+		if len(combinedHistory) > 0 {
+			profile.Recent = faceit.CalculateStatsFromHistory(combinedHistory, currentElo)
+			log.Printf("INFO: Успішно розраховано форму на основі %d матчів (нові + кешовані)", profile.Recent.MatchesAnalyzed)
+		} else if recentForm != nil {
+			profile.Recent = recentForm
 		}
 
 		if profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
