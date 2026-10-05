@@ -6,6 +6,7 @@ import (
 )
 
 func TestCalculateStability(t *testing.T) {
+	t.Parallel()
 	// 1. Порожній список
 	rep := calculateStability(nil)
 	if rep.Score != 0 {
@@ -40,6 +41,7 @@ func TestCalculateStability(t *testing.T) {
 }
 
 func TestCalculateClusters(t *testing.T) {
+	t.Parallel()
 	matches := []PlayerMatchStats{
 		{Kills: "25", Deaths: "10", ADR: "95"}, // Carry (KD=2.5, ADR=95)
 		{Kills: "15", Deaths: "15", ADR: "75"}, // Average (KD=1.0, ADR=75)
@@ -62,6 +64,7 @@ func TestCalculateClusters(t *testing.T) {
 }
 
 func TestSimulateEloScenarios(t *testing.T) {
+	t.Parallel()
 	matches := []PlayerMatchStats{
 		{Result: "1"}, {Result: "1"}, {Result: "1"},
 		{Result: "0"}, {Result: "0"},
@@ -82,6 +85,7 @@ func TestSimulateEloScenarios(t *testing.T) {
 }
 
 func TestCalculateWinConditions(t *testing.T) {
+	t.Parallel()
 	matches := []PlayerMatchStats{
 		{Result: "1", ADR: "100", Kills: "20", Deaths: "10", Assists: "6", FirstKills: "3"},
 		{Result: "1", ADR: "90", Kills: "18", Deaths: "10", Assists: "5", FirstKills: "2"},
@@ -111,13 +115,15 @@ func TestCalculateWinConditions(t *testing.T) {
 }
 
 func TestCalculatePlayActivity(t *testing.T) {
-	nowUnix := time.Now().Unix()
+	t.Parallel()
+	fixedTime := time.Date(2026, time.October, 5, 14, 0, 0, 0, time.UTC)
+	refUnix := fixedTime.Unix()
 	matches := []PlayerMatchStats{
-		{Result: "1", CreatedAt1: nowUnix},
-		{Result: "0", CreatedAt1: nowUnix - 3600},
+		{Result: "1", CreatedAt1: refUnix},
+		{Result: "0", CreatedAt1: refUnix - 3600},
 	}
 
-	act := CalculatePlayActivity(matches)
+	act := CalculatePlayActivityAt(matches, fixedTime)
 	if act == nil {
 		t.Fatal("Expected non-nil activity report")
 	}
@@ -126,6 +132,12 @@ func TestCalculatePlayActivity(t *testing.T) {
 	}
 	if act.TotalWins != 1 {
 		t.Errorf("Expected 1 win, got %d", act.TotalWins)
+	}
+	if act.MostActiveMonthName != "жовтень" {
+		t.Errorf("Expected most active month 'жовтень', got '%s'", act.MostActiveMonthName)
+	}
+	if act.MostActiveMonthMatches != 2 {
+		t.Errorf("Expected 2 matches in most active month, got %d", act.MostActiveMonthMatches)
 	}
 	if len(act.HourlyDistribution) != 24 {
 		t.Errorf("Expected 24 hours, got %d", len(act.HourlyDistribution))
