@@ -48,6 +48,8 @@ export function switchTab(tabId) {
             }
         }
     });
+
+    window.dispatchEvent(new CustomEvent('tab-switched', { detail: { tabId } }));
 }
 
 export function goHome() {

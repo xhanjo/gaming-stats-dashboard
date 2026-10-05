@@ -42,6 +42,41 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      #heatmapScrollSlider {
+        -webkit-appearance: none;
+        appearance: none;
+        background: #27272a;
+        outline: none;
+        border-radius: 9999px;
+      }
+      #heatmapScrollSlider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 60px;
+        height: 6px;
+        background: #a1a1aa;
+        border-radius: 9999px;
+        cursor: grab;
+        transition: background 0.15s, transform 0.15s;
+      }
+      #heatmapScrollSlider::-webkit-slider-thumb:hover {
+        background: #f43f5e;
+      }
+      #heatmapScrollSlider::-webkit-slider-thumb:active {
+        cursor: grabbing;
+        background: #ff007f;
+      }
+      #heatmapScrollSlider::-moz-range-thumb {
+        width: 60px;
+        height: 6px;
+        background: #a1a1aa;
+        border: none;
+        border-radius: 9999px;
+        cursor: grab;
+      }
+      #heatmapScrollSlider::-moz-range-thumb:hover {
+        background: #f43f5e;
+      }
     </style>
   </head>
   <body class="bg-dark text-gray-200 font-sans flex flex-col min-h-screen p-4 md:p-8 selection:bg-faceit selection:text-white">
@@ -284,10 +319,10 @@
               <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
                 <div>
                   <div id="paMatches" class="text-4xl font-bold text-white mb-1">0</div>
-                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Зіграно матчів</div>
+                  <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів зіграно</div>
                 </div>
                 <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                  <span class="text-gray-500">Днів у грі</span>
+                  <span class="text-gray-500">Зіграно днів</span>
                   <span id="paDays" class="text-white">0</span>
                 </div>
               </div>
@@ -297,7 +332,7 @@
                   <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніший місяць</div>
                 </div>
                 <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                  <span class="text-gray-500">Зіграно матчів</span>
+                  <span class="text-gray-500">Матчів зіграно</span>
                   <span id="paMonthMatches" class="text-white">0</span>
                 </div>
               </div>
@@ -307,8 +342,8 @@
                   <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Найактивніша година</div>
                 </div>
                 <div class="mt-6 flex justify-between border-t border-gray-800 pt-4 text-sm font-bold">
-                  <span class="text-gray-500">Win rate</span>
-                  <span id="paHourWinrate" class="text-green-400">0%</span>
+                  <span class="text-gray-500">Відсоток перемог</span>
+                  <span id="paHourWinrate" class="text-white">0%</span>
                 </div>
               </div>
             </div>
@@ -318,10 +353,10 @@
                 <div class="flex justify-between items-start mb-6">
                   <div>
                     <div class="text-xl font-bold text-white flex items-center gap-2">
-                      <span id="paAvgDaily">0.0</span>
-                      <span class="text-xs text-green-500 font-bold">↑</span>
+                      <span id="paAvgDaily">0</span>
+                      <span id="paDailyTrend" class="text-xs font-bold"></span>
                     </div>
-                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на день (в сер.)</div>
+                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на день</div>
                   </div>
                   <div class="flex gap-3 text-xs font-bold">
                     <span class="flex items-center gap-1 text-gray-300">
@@ -341,10 +376,9 @@
                 <div class="flex justify-between items-start mb-6">
                   <div>
                     <div class="text-xl font-bold text-white flex items-center gap-2">
-                      <span id="paAvgWeekly">0.0</span>
-                      <span class="text-xs text-green-500 font-bold">↑</span>
+                      <span id="paAvgWeekly">0,0</span>
                     </div>
-                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Матчів на тиждень (в сер.)</div>
+                    <div class="text-xs text-gray-500 font-bold uppercase tracking-wider">Сер. кількість матчів на тиждень</div>
                   </div>
                   <div class="flex gap-3 text-xs font-bold">
                     <span class="flex items-center gap-1 text-gray-300">
@@ -361,42 +395,41 @@
               </div>
             </div>
 
-            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl overflow-hidden">
-              <h3 class="text-base font-bold text-white mb-6">Графік активності</h3>
-              <div class="overflow-x-auto scrollbar-hide pb-4">
-                <div class="flex gap-4" style="min-width: 800px">
-                  <div class="flex flex-col text-[10px] text-gray-500 font-bold">
-                    <div class="mb-2 pb-1 opacity-0 text-[10px]">Місяць</div>
-                    <div class="grid grid-rows-7 gap-1 md:gap-1.5">
-                      <div class="h-3 md:h-3.5 flex items-center">П</div>
-                      <div class="h-3 md:h-3.5 flex items-center">В</div>
-                      <div class="h-3 md:h-3.5 flex items-center">С</div>
-                      <div class="h-3 md:h-3.5 flex items-center">Ч</div>
-                      <div class="h-3 md:h-3.5 flex items-center">П</div>
-                      <div class="h-3 md:h-3.5 flex items-center">С</div>
-                      <div class="h-3 md:h-3.5 flex items-center">Н</div>
-                    </div>
-                  </div>
-                  <div id="heatmapGrid" class="flex flex-1 justify-between gap-4 w-full"></div>
+            <div class="bg-card border border-gray-800 rounded-2xl p-6 shadow-xl">
+              <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-white">Активність</h3>
+              </div>
+
+              <!-- Горизонтальний скрол-контейнер для місяців -->
+              <div id="heatmapScrollContainer" class="overflow-x-auto scrollbar-hide pb-2 select-none cursor-grab active:cursor-grabbing">
+                <div id="heatmapMonthsWrapper" class="flex gap-4 md:gap-5 min-w-max py-1">
+                  <!-- Місяці генеруються динамічно через activityTab.js -->
                 </div>
               </div>
-              <div class="flex gap-4 items-center mt-4 text-xs font-bold text-gray-500">
-                <span>Зіграно матчів</span>
-                <span class="flex items-center gap-1">
-                  <span class="w-3 h-3 rounded-sm bg-[#d946ef]"></span>
-                  Багато
+
+              <!-- Нативний скрол-трек / слайдер як на FACEIT -->
+              <div class="mt-4 pt-1">
+                <input type="range" id="heatmapScrollSlider" min="0" max="1000" value="1000" class="w-full h-1 bg-gray-800/80 rounded-lg appearance-none cursor-pointer" title="Прокрутка місяців">
+              </div>
+
+              <!-- Легенда за дизайном FACEIT -->
+              <div class="flex flex-wrap items-center gap-5 mt-6 text-xs font-bold text-gray-400">
+                <span class="text-white">Зіграно Ігор</span>
+                <span class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#f43f5e]"></span>
+                  Високе
                 </span>
-                <span class="flex items-center gap-1">
-                  <span class="w-3 h-3 rounded-sm bg-[#a21caf]"></span>
+                <span class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#c026d3]"></span>
                   Середньо
                 </span>
-                <span class="flex items-center gap-1">
-                  <span class="w-3 h-3 rounded-sm bg-[#6b21a8]"></span>
-                  Мало
+                <span class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#701a75]"></span>
+                  Низький
                 </span>
-                <span class="flex items-center gap-1">
-                  <span class="w-3 h-3 rounded-sm bg-[#18181b] border border-gray-800"></span>
-                  Немає
+                <span class="flex items-center gap-2">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#202026] border border-gray-700"></span>
+                  No Games
                 </span>
               </div>
             </div>
