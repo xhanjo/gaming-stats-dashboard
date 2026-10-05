@@ -6,7 +6,7 @@
 ![Tailwind CSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
 ![Chart.js](https://img.shields.io/badge/chart.js-%23F5788D.svg?style=for-the-badge&logo=chart.js&logoColor=white)
 
-**Gaming Stats Dashboard** is a high-performance CS2 analytics platform designed to aggregate, compute, and visualize player statistics. Built with a Go backend and a modular Vanilla JavaScript frontend (native ES6+ modules without build overhead), it integrates with the FACEIT Data API to perform statistical modeling, heuristic role clustering, deterministic Elo regression, and win-condition impact analysis.
+**Gaming Stats Dashboard** is a high-performance CS2 analytics platform designed to aggregate, compute, and visualize player statistics. Built with a Go backend and a modular Vanilla JavaScript frontend (native ES6+ modules without build overhead), it integrates with the FACEIT Data API to perform statistical modeling, heuristic role clustering, deterministic Elo regression, smart match history retention, and win-condition impact analysis.
 
 ---
 
@@ -15,50 +15,58 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                 Client Layer (Browser)                      │
-│   Native ES6+ Modules • Reactive Store • Chart.js Lifecycles │
+│   Native ES6+ Modules • Reactive Store • Chart.js Lifecycles│
+│   FACEIT 7-Row Heatmap • Synchronized Custom Slider Track   │
 └──────────────────────────────┬──────────────────────────────┘
                                │ HTTP / JSON (CORS-enabled)
 ┌──────────────────────────────▼──────────────────────────────┐
 │                    Go Backend Engine                        │
-│   Chi Router • Context Propagation • Graceful Shutdown      │
+│   Chi Router • Context Propagation • Slowloris Timeouts     │
 ├──────────────────────────────┬──────────────────────────────┤
 │      Analytics Engine        │      FACEIT Worker Pool      │
-│  Stability • Heuristics      │  Bounded Concurrency         │
-│  Elo Trajectories • Win Cond │  Backoff & Rate Limit Retry  │
+│  Stability • Clustering      │  Bounded Concurrency (5)     │
+│  Elo Trajectories • Scenarios│  Backoff & Rate Limit Retry  │
+│  Activity & Win Conditions   │  Smart Fallback Caching      │
 └──────────────────────────────┴──────────────┬───────────────┘
                                               │
                                ┌──────────────▼───────────────┐
                                │     SQLite Data Warehouse    │
                                │  WAL Mode • Busy Timeout 5s  │
                                │  MaxOpenConns(1) • Atomic Tx │
+                               │  History Merge (1000 items)  │
                                └──────────────────────────────┘
 ```
 
-### 1. Backend Analytics Engine (`internal/faceit/analytics.go`)
-Heavy business analytics and mathematical computations run server-side in Go as the Single Source of Truth:
-- **K/D Stability Index (`CalculateStability`):** Computes mean, variance, and standard deviation of K/D across matches, mapping volatility to a normalized stability score (0–100%).
-- **Rule-Based Impact Clustering (`CalculateClusters`):** Classifies matches into Carry, Average, and Low Impact tiers using esports performance thresholds.
-- **Deterministic Elo Projections (`SimulateEloScenarios`):** Simulates future match trajectories (+10 matches) across Expected, Optimistic, and Pessimistic scenarios using Bresenham distribution for idempotent API responses.
-- **Win Conditions Matrix (`CalculateWinConditions`):** Evaluates how exceeding key performance thresholds impacts victory probabilities vs. baseline win rate across 5 drivers:
+### 1. Modular Analytics Engine (`internal/faceit/`)
+Heavy business analytics and mathematical computations run server-side in Go as the Single Source of Truth, decomposed into focused domain packages:
+- **K/D Stability Index (`stability.go`):** Computes mean, variance, and standard deviation of K/D across matches, mapping volatility to a normalized stability score (0–100%).
+- **Rule-Based Impact Clustering (`clustering.go`):** Classifies matches into Carry, Average, and Low Impact tiers using esports performance thresholds.
+- **Deterministic Elo Projections (`scenarios.go`):** Simulates future match trajectories (+10 matches) across Expected, Optimistic, and Pessimistic scenarios using Bresenham distribution for idempotent API responses.
+- **Win Conditions Matrix (`win_conditions.go`):** Evaluates how exceeding key performance thresholds impacts victory probabilities vs. baseline win rate across 5 drivers:
   - ADR above personal average (`ADR ≥ player mean`)
   - Positive K/D ratio (`K/D ≥ 1.15`)
   - High fragging volume (`18+ Kills` in MR12)
   - Round opener impact (`2+ First Kills / Entry`)
   - Teamplay and trades (`5+ Assists`)
-- **Activity & Heatmap Generation (`CalculatePlayActivity`):** Generates 24-hour and 7-day distribution matrices alongside a 6-month calendar activity matrix.
+- **Activity & Heatmap Generation (`activity.go`):** Computes 24-hour and 7-day distribution matrices, peak 3-hour UTC active windows, localized Ukrainian 12h time formatting (`4пп`/`дп`), rolling daily trend deltas (`↓ 1,3`), and unique ISO calendar week match rates.
+- **Role Classification & Normalization (`playstyle.go`, `stats.go`, `elo.go`):** Heuristic role assignment (Entry Fragger, AWPer, Support, Lurker, Rifler), linear Elo progression trends, and weighted radar chart metrics.
 
-### 2. SQLite Concurrency & Storage (`internal/storage/db.go`)
+### 2. SQLite Concurrency, Retention & Smart Caching (`internal/storage/db.go`)
 - **WAL Mode & Single-Writer Optimization:** Configured with `_journal_mode=WAL`, `_busy_timeout=5000`, and `SetMaxOpenConns(1)` to eliminate `database is locked` errors during concurrent operations.
+- **Match History Retention & Deduplication:** When refreshing profiles, existing cached matches are preserved and merged with incoming matches (`MaxHistorySize = 1000`), preventing historical data loss.
+- **Case-Insensitive Queries:** Player lookups utilize `COLLATE NOCASE` indexing for reliable cross-casing retrieval.
+- **Graceful Error Fallback:** If the external FACEIT API is unreachable or rate-limited, the handler gracefully serves the latest cached player snapshot.
 - **Parameterized & Atomic Transactions:** Employs parameterized queries and atomic transactions with deferred rollbacks (`defer tx.Rollback()`) to prevent SQL injection and transaction corruption.
-- **Context-Aware I/O:** All queries execute via `QueryRowContext` and `ExecContext`, honoring client disconnections and timeouts.
 
-### 3. Resilient API Client & Worker Pool (`internal/faceit/client.go`)
-- **Bounded Concurrency:** Uses a worker pool pattern (`sync.WaitGroup` with buffered channels) bounded to 5 concurrent workers.
+### 3. Resilient API Client, Worker Pool & Server Protection (`internal/faceit/`, `cmd/server/main.go`)
+- **Bounded Concurrency (`worker_pool.go`):** Fetches match stats concurrently using a bounded worker pool pattern (`sync.WaitGroup` with buffered job channels) capped at 5 workers.
 - **Rate Limit Resilience (HTTP 429):** Automatic exponential backoff retry mechanism with context-aware aborts on cancellation.
-- **Strict HTTP Timeouts:** All external HTTP requests have explicit timeouts (`10s`) and propagate request contexts (`http.NewRequestWithContext`).
+- **Slowloris & Timeout Protection:** HTTP server enforces strict operational timeouts (`ReadHeaderTimeout: 5s`, `ReadTimeout: 10s`, `WriteTimeout: 15s`, `IdleTimeout: 60s`).
+- **Dependency Injection:** Database storage and FACEIT clients are injected via interfaces, ensuring testability and separation of concerns.
 
 ### 4. Modular Frontend Architecture (`frontend/src/`)
 - **Native ES6+ Modules:** No webpack, Vite, or Node.js build steps needed. Runs natively in any modern browser.
+- **FACEIT-Accurate 7-Row Activity Heatmap (`activityTab.js`):** Compact GitHub/FACEIT-style Monday–Sunday grid with custom draggable track slider, smooth wheel scrolling, two-way slider synchronization, and tab-switch auto-alignment via `IntersectionObserver` & `ResizeObserver`.
 - **Reactive State Store (`store.js`):** Lightweight centralized store with pub/sub architecture and persistent search history in `localStorage`.
 - **Chart.js Lifecycle & Memory Safety (`chartManager.js`):** `destroyAllCharts()` explicitly frees canvas contexts, prevents memory leaks, and removes orphaned HTML tooltips.
 - **Chronological 30-Match Timeline (`summaryTab.js`):** Summary tab restricts visual timelines to the latest 30 matches, ordered left-to-right (oldest on left, newest on right).
@@ -72,20 +80,31 @@ Heavy business analytics and mathematical computations run server-side in Go as 
 gaming-stats-dashboard/
 ├── cmd/
 │   └── server/
-│       └── main.go                 # HTTP server, Chi router, CORS & Graceful Shutdown
+│       └── main.go                 # HTTP server, Chi router, Slowloris timeouts & Graceful Shutdown
 ├── internal/
 │   ├── faceit/
-│   │   ├── client.go               # FACEIT API client, worker pool & concurrency models
-│   │   ├── client_test.go          # Worker pool & HTTP client tests
-│   │   ├── analytics.go            # Statistical engine (Stability, Clusters, Elo, Win Conds)
+│   │   ├── models.go               # Domain entities, DTOs & response schemas
+│   │   ├── client.go               # FACEIT API client, HTTP retry & backoff logic
+│   │   ├── client_test.go          # HTTP client unit & integration tests
+│   │   ├── worker_pool.go          # Bounded concurrency match details worker pool
+│   │   ├── stats.go                # Recent form aggregations & score parsing
+│   │   ├── elo.go                  # Linear regression & Elo trend predictions
+│   │   ├── playstyle.go            # Playstyle role heuristic classifier
+│   │   ├── analytics.go            # Analytics coordinator & radar normalization
 │   │   ├── analytics_test.go       # Comprehensive analytics unit tests
-│   │   └── calculate_test.go       # Table-driven recent form calculation tests
+│   │   ├── stability.go            # K/D volatility & stability index calculator
+│   │   ├── clustering.go           # Impact tier clustering (Carry, Mid, Low)
+│   │   ├── scenarios.go            # Deterministic Bresenham Elo projections
+│   │   ├── win_conditions.go       # Win conditions probability matrix
+│   │   ├── activity.go             # Heatmap & FACEIT-accurate activity metrics
+│   │   ├── activity_test.go        # Activity distribution & trend tests
+│   │   └── calculate_test.go       # Form calculation table-driven tests
 │   ├── handlers/
-│   │   ├── player.go               # REST API endpoints & query parameter validation
+│   │   ├── player.go               # REST API endpoints, DI & fallback caching
 │   │   └── player_test.go          # HTTP handler tests with mock database
 │   └── storage/
-│       ├── db.go                   # SQLite WAL connection pool & atomic transactions
-│       └── db_test.go              # Database integration tests
+│       ├── db.go                   # SQLite WAL, deduplicated history merge & caching
+│       └── db_test.go              # Database integration & concurrency tests
 ├── frontend/
 │   ├── index.html                  # Semantic application skeleton
 │   ├── assets/                     # Maps, rank icons & static SVG badges
@@ -101,12 +120,12 @@ gaming-stats-dashboard/
 │       ├── components/
 │       │   ├── searchBar.js        # Player search, loading spinners, history tags & deep scan
 │       │   ├── playerHeader.js     # Profile card, level 1–11 badges, country flag & steam link
-│       │   ├── tabs.js             # Event-delegated tab navigation
+│       │   ├── tabs.js             # Event-delegated tab navigation & sync dispatch
 │       │   ├── summaryTab.js       # 30-match chronological timeline, K/D trend & metric switch
 │       │   ├── matchesTab.js       # Match history table with pagination ("Load more")
 │       │   ├── mapsTab.js          # 5v5 map statistics and win rate progress bars
-│       │   ├── activityTab.js      # Hourly/weekly bar charts & 6-month activity heatmap
-│       │   └── analyticsTab.js     # Playstyle radar, stability gauge, cluster scatter, 6 win conditions
+│       │   ├── activityTab.js      # Hourly/weekly bar charts & 7-row activity heatmap with custom slider
+│       │   └── analyticsTab.js     # Playstyle radar, stability gauge, cluster scatter, 5 win conditions
 │       └── charts/
 │           └── chartManager.js     # Chart.js instance lifecycle, universal & analytics tooltips
 ├── go.mod
@@ -210,8 +229,26 @@ Fetches player overview, CS2 statistics, cached match history, and computed anal
     },
     "activity": {
       "total_matches": 100,
-      "hourly_distribution": [...],
-      "daily_distribution": [...],
+      "total_wins": 54,
+      "unique_days_count": 32,
+      "current_month_name": "жовтень",
+      "current_month_matches": 42,
+      "most_active_month_name": "жовтень",
+      "most_active_month_matches": 42,
+      "most_active_hour": 16,
+      "most_active_hour_display": "4пп",
+      "most_active_hour_winrate": 47.1,
+      "avg_daily_matches": 3,
+      "daily_trend_delta": -1.3,
+      "daily_trend_display": "↓ 1,3",
+      "daily_trend_direction": "down",
+      "avg_weekly_matches": 10.2,
+      "hourly_distribution": [
+        { "hour": 0, "matches": 2, "wins": 1 }
+      ],
+      "daily_distribution": [
+        { "day_name": "Пн", "matches": 14, "wins": 8 }
+      ],
       "match_counts_by_date": { "2026-04-20": 4 }
     },
     "match_history": [...]
