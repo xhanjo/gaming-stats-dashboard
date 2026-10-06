@@ -18,12 +18,13 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 		totalEntry += parseIntSafe(stats.FirstKills)
 		totalSniper += parseIntSafe(stats.SniperKills)
 
-		// Рахуємо мультикіли для Опорника
+		// Рахуємо мультикіли (3k+)
 		totalMulti += parseIntSafe(stats.TripleKills)
 		totalMulti += parseIntSafe(stats.QuadroKills)
 		totalMulti += parseIntSafe(stats.PentaKills)
 	}
 
+	avgKills := totalKills / float64(successfulMatches)
 	avgSniper := float64(totalSniper) / float64(successfulMatches)
 	avgEntry := float64(totalEntry) / float64(successfulMatches)
 	avgAssists := totalAssists / float64(successfulMatches)
@@ -31,7 +32,7 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 	avgHS := totalHS / float64(successfulMatches)
 	avgMulti := float64(totalMulti) / float64(successfulMatches)
 
-	role := DeterminePlaystyle(avgSniper, avgEntry, avgAssists, avgADR, avgHS, avgMulti)
+	role := DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS, avgMulti)
 
 	trendM, predictedElo := CalculateEloRegression(currentElo, formHistory)
 
@@ -40,7 +41,7 @@ func CalculateStatsFromHistory(formHistory []PlayerMatchStats, currentElo int) *
 
 	return &RecentForm{
 		MatchesAnalyzed:  successfulMatches,
-		AvgKills:         totalKills / float64(successfulMatches),
+		AvgKills:         avgKills,
 		AvgADR:           avgADR,
 		AvgHSPercentage:  avgHS,
 		AvgKRRatio:       totalKR / float64(successfulMatches),
