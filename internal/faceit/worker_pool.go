@@ -36,12 +36,33 @@ func (c *Client) CalculateRecentForm(ctx context.Context, playerID string, limit
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			timer := time.NewTimer(workerThrottle)
+			defer timer.Stop()
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+
 			for job := range jobs {
 				select {
 				case <-ctx.Done():
-					results <- matchResult{index: job.index, err: ctx.Err()}
-					continue
-				case <-time.After(workerThrottle):
+					return
+				default:
+				}
+
+				timer.Reset(workerThrottle)
+				select {
+				case <-ctx.Done():
+					if !timer.Stop() {
+						select {
+						case <-timer.C:
+						default:
+						}
+					}
+					return
+				case <-timer.C:
 				}
 
 				stats, err := c.GetMatchStatsForPlayer(ctx, job.item.MatchID, playerID)
@@ -69,6 +90,10 @@ func (c *Client) CalculateRecentForm(ctx context.Context, playerID string, limit
 		if res.err == nil && res.stats != nil {
 			orderedHistory[res.index] = res.stats
 		}
+	}
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	var formHistory []PlayerMatchStats
