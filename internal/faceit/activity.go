@@ -3,6 +3,7 @@ package faceit
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -285,8 +286,9 @@ func parseMatchTime(m PlayerMatchStats, fallbackIndex int) time.Time {
 	return parseMatchTimeAt(m, fallbackIndex, time.Now())
 }
 
-func parseMatchTimeAt(m PlayerMatchStats, fallbackIndex int, refTime time.Time) time.Time {
-	extractTimestamp := func(val any) int64 {
+// ExtractMatchTimestamp повертає Unix timestamp матчу в секундах
+func ExtractMatchTimestamp(m PlayerMatchStats) int64 {
+	extract := func(val any) int64 {
 		if val == nil {
 			return 0
 		}
@@ -308,21 +310,33 @@ func parseMatchTimeAt(m PlayerMatchStats, fallbackIndex int, refTime time.Time) 
 		return 0
 	}
 
-	ts := extractTimestamp(m.CreatedAt1)
+	ts := extract(m.CreatedAt1)
 	if ts == 0 {
-		ts = extractTimestamp(m.UpdatedAt1)
+		ts = extract(m.UpdatedAt1)
 	}
 	if ts == 0 {
-		ts = extractTimestamp(m.CreatedAt2)
+		ts = extract(m.CreatedAt2)
 	}
 	if ts == 0 {
-		ts = extractTimestamp(m.UpdatedAt2)
+		ts = extract(m.UpdatedAt2)
 	}
 
+	if ts > 10000000000 {
+		ts /= 1000
+	}
+	return ts
+}
+
+// SortMatchesDescending сортує список матчів від найновішого до найстарішого
+func SortMatchesDescending(matches []PlayerMatchStats) {
+	sort.SliceStable(matches, func(i, j int) bool {
+		return ExtractMatchTimestamp(matches[i]) > ExtractMatchTimestamp(matches[j])
+	})
+}
+
+func parseMatchTimeAt(m PlayerMatchStats, fallbackIndex int, refTime time.Time) time.Time {
+	ts := ExtractMatchTimestamp(m)
 	if ts > 0 {
-		if ts > 10000000000 {
-			ts /= 1000 // convert ms to seconds
-		}
 		return time.Unix(ts, 0)
 	}
 

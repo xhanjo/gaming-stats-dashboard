@@ -5,6 +5,7 @@
 import { $, show, hide, escapeHtml } from '../utils/dom.js';
 import { store } from '../state/store.js';
 import { fetchPlayerStats } from '../api/playerApi.js';
+import { getMatchTimestamp } from '../utils/dates.js';
 
 export function initSearchBar(onSearchSuccess) {
     const input = $('nicknameInput');
@@ -28,10 +29,13 @@ export function initSearchBar(onSearchSuccess) {
             store.addToHistory(data.nickname);
             input.value = data.nickname;
             
+            const history = (data.recent_form?.match_history || []).slice();
+            history.sort((a, b) => getMatchTimestamp(b) - getMatchTimestamp(a));
+
             store.setState({
                 player: data,
-                matchHistory: data.recent_form?.match_history || [],
-                rawMatchHistory: data.recent_form?.match_history || [],
+                matchHistory: history,
+                rawMatchHistory: history,
                 errorMessage: null,
                 isLoading: false,
                 isDeepScanLoading: false

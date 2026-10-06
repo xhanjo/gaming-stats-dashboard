@@ -158,6 +158,9 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 		finalHistory = append(finalHistory, newMatches...)
 		finalHistory = append(finalHistory, combinedHistory...)
 
+		// Гарантуємо хронологічний порядок від найновішого до найстарішого
+		faceit.SortMatchesDescending(finalHistory)
+
 		if len(finalHistory) > maxHistorySize {
 			finalHistory = finalHistory[:maxHistorySize]
 		}
@@ -269,6 +272,7 @@ func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.Playe
 			}
 		}
 		if len(matchHistory) > 0 {
+			faceit.SortMatchesDescending(matchHistory)
 			p.Recent = faceit.CalculateStatsFromHistory(matchHistory, cs2Elo)
 		}
 		if p.Recent == nil && rMatches > 0 {

@@ -149,6 +149,9 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 			}
 		}
 
+		// Сортуємо матчі від найновішого до найстарішого
+		faceit.SortMatchesDescending(combinedHistory)
+
 		if len(combinedHistory) > faceit.MaxHistorySize {
 			combinedHistory = combinedHistory[:faceit.MaxHistorySize]
 		}
