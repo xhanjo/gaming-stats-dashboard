@@ -24,6 +24,9 @@ func New(dbPath string) (*Storage, error) {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
 
+	// SQLite краще працює з одним writer з'єднанням
+	db.SetMaxOpenConns(1)
+
 	// Обов'язкові PRAGMA для конкурентного доступу
 	pragmas := []string{
 		"PRAGMA journal_mode=WAL",
@@ -33,14 +36,13 @@ func New(dbPath string) (*Storage, error) {
 	}
 	for _, p := range pragmas {
 		if _, err := db.Exec(p); err != nil {
+			_ = db.Close()
 			return nil, fmt.Errorf("exec %q: %w", p, err)
 		}
 	}
 
-	// SQLite краще працює з одним writer з'єднанням
-	db.SetMaxOpenConns(1)
-
 	if err := db.Ping(); err != nil {
+		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)
 	}
 	return &Storage{db: db}, nil
@@ -55,23 +57,23 @@ func (s *Storage) InitTable(ctx context.Context) error {
 	CREATE TABLE IF NOT EXISTS players (
 		player_id TEXT PRIMARY KEY,
 		nickname TEXT UNIQUE NOT NULL,
-		avatar TEXT,
-		country TEXT,
-		steam_id TEXT,
-		cs2_level INTEGER,
-		cs2_elo INTEGER,
-		cs2_kd TEXT,
-		cs2_winrate TEXT,
-		cs2_matches TEXT,
-		map_stats TEXT,
-		recent_matches_analyzed INTEGER,
-		recent_avg_kills REAL,
-		recent_avg_adr REAL,
-		recent_avg_hs REAL,
-		recent_avg_kr REAL,
-		recent_total_entry INTEGER,
-		recent_total_sniper INTEGER,
-		recent_history TEXT,
+		avatar TEXT DEFAULT '' NOT NULL,
+		country TEXT DEFAULT '' NOT NULL,
+		steam_id TEXT DEFAULT '' NOT NULL,
+		cs2_level INTEGER DEFAULT 0 NOT NULL,
+		cs2_elo INTEGER DEFAULT 0 NOT NULL,
+		cs2_kd TEXT DEFAULT '' NOT NULL,
+		cs2_winrate TEXT DEFAULT '' NOT NULL,
+		cs2_matches TEXT DEFAULT '' NOT NULL,
+		map_stats TEXT DEFAULT '' NOT NULL,
+		recent_matches_analyzed INTEGER DEFAULT 0 NOT NULL,
+		recent_avg_kills REAL DEFAULT 0 NOT NULL,
+		recent_avg_adr REAL DEFAULT 0 NOT NULL,
+		recent_avg_hs REAL DEFAULT 0 NOT NULL,
+		recent_avg_kr REAL DEFAULT 0 NOT NULL,
+		recent_total_entry INTEGER DEFAULT 0 NOT NULL,
+		recent_total_sniper INTEGER DEFAULT 0 NOT NULL,
+		recent_history TEXT DEFAULT '' NOT NULL,
 		last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
 	);`
 
@@ -105,7 +107,7 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 	var rKills, rADR, rHS, rKR float64
 	var historyJSON []byte
 
-	// F11: Атомарний read-modify-write через транзакцію
+	// Атомарний read-modify-write через транзакцію
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -122,7 +124,7 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 		rSniper = profile.Recent.TotalSniperKills
 
 		var oldHistoryText string
-		readErr := tx.QueryRowContext(ctx, "SELECT recent_history FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
+		readErr := tx.QueryRowContext(ctx, "SELECT COALESCE(recent_history, '') FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
 		if readErr != nil && readErr != sql.ErrNoRows {
 			return fmt.Errorf("read history: %w", readErr)
 		}
@@ -211,8 +213,13 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 
 func (s *Storage) GetPlayer(ctx context.Context, nickname string) (*faceit.PlayerProfile, error) {
 	query := `
-	SELECT player_id, nickname, avatar, country, steam_id, cs2_level, cs2_elo, cs2_kd, cs2_winrate, cs2_matches, map_stats,
-		recent_matches_analyzed, recent_avg_kills, recent_avg_adr, recent_avg_hs, recent_avg_kr, recent_total_entry, recent_total_sniper, recent_history,
+	SELECT player_id, nickname,
+		COALESCE(avatar, ''), COALESCE(country, ''), COALESCE(steam_id, ''),
+		COALESCE(cs2_level, 0), COALESCE(cs2_elo, 0),
+		COALESCE(cs2_kd, ''), COALESCE(cs2_winrate, ''), COALESCE(cs2_matches, ''), COALESCE(map_stats, ''),
+		COALESCE(recent_matches_analyzed, 0), COALESCE(recent_avg_kills, 0), COALESCE(recent_avg_adr, 0),
+		COALESCE(recent_avg_hs, 0), COALESCE(recent_avg_kr, 0), COALESCE(recent_total_entry, 0), COALESCE(recent_total_sniper, 0),
+		COALESCE(recent_history, ''),
 		last_updated
 	FROM players WHERE nickname = ? COLLATE NOCASE`
 

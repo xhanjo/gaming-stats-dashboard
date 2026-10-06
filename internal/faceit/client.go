@@ -3,12 +3,15 @@ package faceit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+var ErrNotFound = errors.New("not found")
 
 const (
 	defaultHTTPTimeout    = 10 * time.Second
@@ -116,6 +119,9 @@ func (c *Client) doRequest(ctx context.Context, targetURL string, result any) er
 		if resp.StatusCode != http.StatusOK {
 			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				return ErrNotFound
+			}
 			return fmt.Errorf("FACEIT API: status %d", resp.StatusCode)
 		}
 
@@ -135,6 +141,9 @@ func (c *Client) GetPlayerProfile(ctx context.Context, nickname string) (*Player
 
 	var profile PlayerProfile
 	if err := c.doRequest(ctx, reqURL, &profile); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, fmt.Errorf("get player profile: %w", ErrNotFound)
+		}
 		return nil, fmt.Errorf("get player profile: %w", err)
 	}
 	return &profile, nil
@@ -174,7 +183,7 @@ func (c *Client) GetPlayerMatchHistory(ctx context.Context, playerID string, lim
 		var historyResponse MatchHistoryResponse
 		if err := c.doRequest(ctx, reqURL, &historyResponse); err != nil {
 			if len(allItems) > 0 {
-				break // partial results
+				break
 			}
 			return nil, fmt.Errorf("match history: %w", err)
 		}

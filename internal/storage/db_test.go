@@ -193,3 +193,56 @@ func TestGetPlayer_OlderThanOneHour(t *testing.T) {
 		t.Errorf("Expected LastUpdated to be populated")
 	}
 }
+
+func TestGetPlayer_WithNullColumns(t *testing.T) {
+	ctx := context.Background()
+
+	store, err := New(":memory:")
+	if err != nil {
+		t.Fatalf("Connection error: %v", err)
+	}
+	defer store.Close()
+
+	// Створюємо спрощену таблицю з явними NULL полями для симуляції legacy або пошкоджених записів
+	_, err = store.db.Exec(`
+	CREATE TABLE players (
+		player_id TEXT PRIMARY KEY,
+		nickname TEXT UNIQUE NOT NULL,
+		avatar TEXT,
+		country TEXT,
+		steam_id TEXT,
+		cs2_level INTEGER,
+		cs2_elo INTEGER,
+		cs2_kd TEXT,
+		cs2_winrate TEXT,
+		cs2_matches TEXT,
+		map_stats TEXT,
+		recent_matches_analyzed INTEGER,
+		recent_avg_kills REAL,
+		recent_avg_adr REAL,
+		recent_avg_hs REAL,
+		recent_avg_kr REAL,
+		recent_total_entry INTEGER,
+		recent_total_sniper INTEGER,
+		recent_history TEXT,
+		last_updated DATETIME
+	);
+	INSERT INTO players (player_id, nickname) VALUES ('null_id_1', 'null_user');
+	`)
+	if err != nil {
+		t.Fatalf("Setup table error: %v", err)
+	}
+
+	retrieved, err := store.GetPlayer(ctx, "null_user")
+	if err != nil {
+		t.Fatalf("GetPlayer failed on NULL columns: %v", err)
+	}
+
+	if retrieved.Nickname != "null_user" {
+		t.Errorf("Expected nickname 'null_user', got %s", retrieved.Nickname)
+	}
+	if retrieved.Avatar != "" || retrieved.Country != "" {
+		t.Errorf("Expected empty string defaults for NULL fields, got avatar=%q country=%q", retrieved.Avatar, retrieved.Country)
+	}
+}
+

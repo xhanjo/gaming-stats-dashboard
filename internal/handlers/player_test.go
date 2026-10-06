@@ -200,6 +200,40 @@ func TestGetPlayerStats_FaceitError(t *testing.T) {
 	}
 }
 
+func TestGetPlayerStats_PlayerNotFound(t *testing.T) {
+	mockDB := &MockDB{
+		GetPlayerFunc: func(ctx context.Context, nickname string) (*faceit.PlayerProfile, error) {
+			return nil, sql.ErrNoRows
+		},
+	}
+
+	mockFaceit := &MockFaceitService{
+		GetPlayerProfileFunc: func(ctx context.Context, nickname string) (*faceit.PlayerProfile, error) {
+			return nil, faceit.ErrNotFound
+		},
+	}
+
+	r := chi.NewRouter()
+	r.Get("/api/player/{nickname}", GetPlayerStats(mockDB, mockFaceit))
+
+	req, _ := http.NewRequest(http.MethodGet, "/api/player/ghost_player", nil)
+	rr := httptest.NewRecorder()
+
+	r.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("Expected status 404, got %d", rr.Code)
+	}
+
+	var resp errorResponse
+	if err := json.NewDecoder(rr.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode JSON error: %v", err)
+	}
+	if resp.Error != "Гравця 'ghost_player' не знайдено на Faceit" {
+		t.Errorf("Unexpected error message: %s", resp.Error)
+	}
+}
+
 func TestGetPlayerStats_ValidationErrors(t *testing.T) {
 	mockDB := &MockDB{}
 	mockFaceit := &MockFaceitService{}

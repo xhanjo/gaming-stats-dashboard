@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -95,7 +96,11 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 				}
 				return
 			}
-			writeJSONError(w, http.StatusInternalServerError, "Гравця не знайдено або Faceit API заблокував запити (429)")
+			if errors.Is(err, faceit.ErrNotFound) {
+				writeJSONError(w, http.StatusNotFound, fmt.Sprintf("Гравця '%s' не знайдено на Faceit", nickname))
+				return
+			}
+			writeJSONError(w, http.StatusInternalServerError, "Помилка зв'язку з Faceit API (429 або таймаут)")
 			return
 		}
 
