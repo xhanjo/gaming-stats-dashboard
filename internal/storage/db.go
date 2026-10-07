@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -112,7 +113,9 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	if profile.Recent != nil {
 		rMatches = profile.Recent.MatchesAnalyzed
@@ -125,7 +128,7 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 
 		var oldHistoryText string
 		readErr := tx.QueryRowContext(ctx, "SELECT COALESCE(recent_history, '') FROM players WHERE player_id = ?", profile.PlayerID).Scan(&oldHistoryText)
-		if readErr != nil && readErr != sql.ErrNoRows {
+		if readErr != nil && !errors.Is(readErr, sql.ErrNoRows) {
 			return fmt.Errorf("read history: %w", readErr)
 		}
 
