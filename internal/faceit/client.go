@@ -224,21 +224,3 @@ func (c *Client) GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlay
 
 	return nil, fmt.Errorf("гравця %s не знайдено в матчі %s", targetPlayerID, matchID)
 }
-
-// Legacy package-level functions for backward compatibility:
-
-func GetPlayerProfile(ctx context.Context, nickname, apiKey string) (*PlayerProfile, error) {
-	return NewClient(apiKey).GetPlayerProfile(ctx, nickname)
-}
-
-func GetCS2Stats(ctx context.Context, playerID, apiKey string) (*CS2Stats, error) {
-	return NewClient(apiKey).GetCS2Stats(ctx, playerID)
-}
-
-func GetPlayerMatchHistory(ctx context.Context, playerID, apiKey string, limit int) ([]MatchHistoryItem, error) {
-	return NewClient(apiKey).GetPlayerMatchHistory(ctx, playerID, limit)
-}
-
-func GetMatchStatsForPlayer(ctx context.Context, matchID, targetPlayerID, apiKey string) (*PlayerMatchStats, error) {
-	return NewClient(apiKey).GetMatchStatsForPlayer(ctx, matchID, targetPlayerID)
-}

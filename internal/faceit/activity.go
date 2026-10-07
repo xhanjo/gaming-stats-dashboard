@@ -282,9 +282,6 @@ func isMatchWin(m PlayerMatchStats) bool {
 	return res == "1" || res == "true"
 }
 
-func parseMatchTime(m PlayerMatchStats, fallbackIndex int) time.Time {
-	return parseMatchTimeAt(m, fallbackIndex, time.Now())
-}
 
 // ExtractMatchTimestamp повертає Unix timestamp матчу в секундах
 func ExtractMatchTimestamp(m PlayerMatchStats) int64 {

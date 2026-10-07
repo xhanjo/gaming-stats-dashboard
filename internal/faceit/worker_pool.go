@@ -110,8 +110,3 @@ func (c *Client) CalculateRecentForm(ctx context.Context, playerID string, limit
 
 	return CalculateStatsFromHistory(formHistory, currentElo), nil
 }
-
-// CalculateRecentForm legacy standalone function for backwards compatibility
-func CalculateRecentForm(ctx context.Context, playerID, apiKey string, limit int, currentElo int) (*RecentForm, error) {
-	return NewClient(apiKey).CalculateRecentForm(ctx, playerID, limit, currentElo)
-}
