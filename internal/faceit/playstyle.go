@@ -16,7 +16,7 @@ func DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS
 
 	// 2. Розрахунок скорингу ролей (0..100)
 
-	// --- 🎯 Main AWPer ---
+	// --- Main AWPer ---
 	// Висока кількість кілів з AWP (8+ за матч = 100) та значна частка від усіх кілів (38%+ = 100)
 	normSniperVol := math.Min((avgSniper/7.5)*100.0, 100.0)
 	normSniperShare := math.Min((sniperShare/38.0)*100.0, 100.0)
@@ -25,7 +25,7 @@ func DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS
 		awpScore *= (avgSniper / 4.0)
 	}
 
-	// --- ⚡ Entry Fragger ---
+	// --- Entry Fragger ---
 	// Опенер: високий First Kills (у MR12 2.8+ це топ рівень) + темповий імпакт
 	normEntry := math.Min((avgEntry/2.8)*100.0, 100.0)
 	normEntryADR := math.Min((avgADR/82.0)*100.0, 100.0)
@@ -37,7 +37,7 @@ func DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS
 		entryScore *= 0.70
 	}
 
-	// --- 🌟 Star Rifler ---
+	// --- Star Rifler ---
 	// Головний рифлер/кері: високий ADR (92+) + точність хедшотів (58%+) + мультикіли на гвинтівках
 	normStarADR := math.Min((avgADR/92.0)*100.0, 100.0)
 	normStarHS := math.Min((avgHS/58.0)*100.0, 100.0)
@@ -50,7 +50,7 @@ func DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS
 		starScore *= math.Max(0.2, 1.0-(sniperShare-25.0)/35.0)
 	}
 
-	// --- 🤝 Support ---
+	// --- Support ---
 	// Гравці підтримки: фокус на асистах розкидками та розмінами (4.5+ у MR12 = 100)
 	normAssists := math.Min((avgAssists/4.5)*100.0, 100.0)
 	supportScore := normAssists
@@ -61,7 +61,7 @@ func DeterminePlaystyle(avgKills, avgSniper, avgEntry, avgAssists, avgADR, avgHS
 		supportScore *= 0.80
 	}
 
-	// --- 🛡️ Anchor ---
+	// --- Anchor ---
 	// Опорник пленту: зупиняє раші мультикілами (0.9+ = 100), грає пасивну позицію (Entry < 1.6), помірний ADR
 	normAnchorMulti := math.Min((avgMulti/0.9)*100.0, 100.0)
 	normAnchorADR := math.Min((avgADR/80.0)*100.0, 100.0)
