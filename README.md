@@ -49,20 +49,24 @@ Heavy business analytics and mathematical computations run server-side in Go as 
   - Round opener impact (`2+ First Kills / Entry`)
   - Teamplay and trades (`5+ Assists`)
 - **Activity & Heatmap Generation (`activity.go`):** Computes 24-hour and 7-day distribution matrices, peak 3-hour UTC active windows, localized Ukrainian 12h time formatting (`4пп`/`дп`), rolling daily trend deltas (`↓ 1,3`), and unique ISO calendar week match rates.
-- **Role Classification & Normalization (`playstyle.go`, `stats.go`, `elo.go`):** Heuristic role assignment (Entry Fragger, AWPer, Support, Lurker, Rifler), linear Elo progression trends, and weighted radar chart metrics.
+- **CS2 MR12 Role Scoring Matrix Engine (`playstyle.go`):** Replaces brittle cascading if-else trees with a multi-factor normalized scoring engine (0–100) tuned for MR12 round economy. Evaluates playstyle across 5 distinct esports archetypes (`Main AWPer`, `Entry Fragger`, `Star Rifler`, `Support`, `Anchor`) and prevents role shadowing via dominance threshold filtering (defaults to `Flex` below 55 pts).
+- **Linear Elo Regression & Form Trends (`elo.go`, `stats.go`):** Evaluates short-term progression slopes and calculates 5-axis radar chart competencies (Fragging, Utility, Opening, Survivability, Versatility).
 
-### 2. SQLite Concurrency, Retention & Smart Caching (`internal/storage/db.go`)
-- **WAL Mode & Single-Writer Optimization:** Configured with `_journal_mode=WAL`, `_busy_timeout=5000`, and `SetMaxOpenConns(1)` to eliminate `database is locked` errors during concurrent operations.
-- **Match History Retention & Deduplication:** When refreshing profiles, existing cached matches are preserved and merged with incoming matches (`MaxHistorySize = 1000`), preventing historical data loss.
+### 2. SQLite Concurrency, Retention & Data Integrity (`internal/storage/db.go`)
+- **Connection Pool & PRAGMA Sequence:** Calls `SetMaxOpenConns(1)` immediately after `sql.Open` before applying `PRAGMA journal_mode=WAL`, `busy_timeout=5000`, and `synchronous=NORMAL`, guaranteeing no unconfigured connections enter the pool and preventing `database is locked` errors.
+- **NULL Safety & Schema Rigor:** Columns enforce `DEFAULT '' NOT NULL` schemas alongside SQL-level `COALESCE` and Go `sql.NullString` scanning to eliminate runtime panics on missing upstream fields.
+- **Deduplicated History Merge & Chronological Ordering:** Combines incoming matches with up to 1000 cached records (`MaxHistorySize`), eliminating duplicates while enforcing strict descending chronological sorting by match timestamps.
+- **Atomic Transactions & Safe Rollbacks:** Employs parameterized queries and atomic transactions with explicitly silenced deferred rollbacks (`defer func() { _ = tx.Rollback() }()`) to guarantee ACID compliance without lint warnings.
 - **Case-Insensitive Queries:** Player lookups utilize `COLLATE NOCASE` indexing for reliable cross-casing retrieval.
-- **Graceful Error Fallback:** If the external FACEIT API is unreachable or rate-limited, the handler gracefully serves the latest cached player snapshot.
-- **Parameterized & Atomic Transactions:** Employs parameterized queries and atomic transactions with deferred rollbacks (`defer tx.Rollback()`) to prevent SQL injection and transaction corruption.
+- **Graceful Offline Fallback:** If the external FACEIT API is unreachable (429 or network timeouts), handlers serve the latest cached player snapshot.
 
 ### 3. Resilient API Client, Worker Pool & Server Protection (`internal/faceit/`, `cmd/server/main.go`)
-- **Bounded Concurrency (`worker_pool.go`):** Fetches match stats concurrently using a bounded worker pool pattern (`sync.WaitGroup` with buffered job channels) capped at 5 workers.
-- **Rate Limit Resilience (HTTP 429):** Automatic exponential backoff retry mechanism with context-aware aborts on cancellation.
-- **Slowloris & Timeout Protection:** HTTP server enforces strict operational timeouts (`ReadHeaderTimeout: 5s`, `ReadTimeout: 10s`, `WriteTimeout: 15s`, `IdleTimeout: 60s`).
-- **Dependency Injection:** Database storage and FACEIT clients are injected via interfaces, ensuring testability and separation of concerns.
+- **Bounded Concurrency with Zero-Leak Worker Pool (`worker_pool.go`):** Coordinates concurrent match downloads using a bounded worker pool (5 workers, `sync.WaitGroup`, buffered channels sized to batch length). Reuses a single `time.NewTimer` per worker via `Reset()` to eliminate garbage collection pressure and prevent timer leaks.
+- **Context-Aware Cancellation & Deadlock Immunity:** Both `jobs` and `results` channels are buffered to the batch size, ensuring workers never block on writes during cancellations (`ctx.Done()`), with centralized channel closure.
+- **Semantic Error Differentiation (404 vs 500):** Differentiates missing players (`faceit.ErrNotFound` → `http.StatusNotFound 404`) from network or rate-limiting outages (500), unwrapped and checked via standard `errors.Is`.
+- **HTTP Keep-Alive Preservation:** Explicitly drains residual socket bytes (`io.Copy(io.Discard, resp.Body)`) prior to `resp.Body.Close()`, ensuring connections return to the HTTP keep-alive pool.
+- **Slowloris & Timeout Protection:** HTTP server enforces strict operational timeouts (`ReadHeaderTimeout: 5s`, `ReadTimeout: 15s`, `WriteTimeout: 60s`, `IdleTimeout: 120s`).
+- **Dependency Injection:** Database storage and FACEIT clients are injected into HTTP handlers via interfaces for modular testing and mocking.
 
 ### 4. Modular Frontend Architecture (`frontend/src/`)
 - **Native ES6+ Modules:** No webpack, Vite, or Node.js build steps needed. Runs natively in any modern browser.
