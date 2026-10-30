@@ -282,7 +282,6 @@ func isMatchWin(m PlayerMatchStats) bool {
 	return res == "1" || res == "true"
 }
 
-
 // ExtractMatchTimestamp повертає Unix timestamp матчу в секундах
 func ExtractMatchTimestamp(m PlayerMatchStats) int64 {
 	extract := func(val any) int64 {
@@ -329,6 +328,33 @@ func SortMatchesDescending(matches []PlayerMatchStats) {
 	sort.SliceStable(matches, func(i, j int) bool {
 		return ExtractMatchTimestamp(matches[i]) > ExtractMatchTimestamp(matches[j])
 	})
+}
+
+// MergeMatchHistories об'єднує декілька списків матчів без дублікатів за MatchId,
+// сортує їх у хронологічному порядку (від найновішого) та обмежує до MaxHistorySize.
+func MergeMatchHistories(batches ...[]PlayerMatchStats) []PlayerMatchStats {
+	var merged []PlayerMatchStats
+	seen := make(map[string]bool)
+
+	for _, batch := range batches {
+		for _, m := range batch {
+			if m.MatchId != "" {
+				if seen[m.MatchId] {
+					continue
+				}
+				seen[m.MatchId] = true
+			}
+			merged = append(merged, m)
+		}
+	}
+
+	SortMatchesDescending(merged)
+
+	if len(merged) > MaxHistorySize {
+		merged = merged[:MaxHistorySize]
+	}
+
+	return merged
 }
 
 func parseMatchTimeAt(m PlayerMatchStats, fallbackIndex int, refTime time.Time) time.Time {

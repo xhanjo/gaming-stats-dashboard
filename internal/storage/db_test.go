@@ -245,4 +245,3 @@ func TestGetPlayer_WithNullColumns(t *testing.T) {
 		t.Errorf("Expected empty string defaults for NULL fields, got avatar=%q country=%q", retrieved.Avatar, retrieved.Country)
 	}
 }
-

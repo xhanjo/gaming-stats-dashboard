@@ -15,9 +15,9 @@ func TestCalculatePlayActivity_Synthetic(t *testing.T) {
 	refUnix := fixedTime.Unix()
 
 	matches := []PlayerMatchStats{
-		{Result: "1", CreatedAt1: refUnix},             // 2026-09-15 16:00
-		{Result: "0", CreatedAt1: refUnix - 86400},     // 2026-09-14 16:00
-		{Result: "1", CreatedAt1: refUnix - 7*86400},   // 2026-09-08 16:00
+		{Result: "1", CreatedAt1: refUnix},           // 2026-09-15 16:00
+		{Result: "0", CreatedAt1: refUnix - 86400},   // 2026-09-14 16:00
+		{Result: "1", CreatedAt1: refUnix - 7*86400}, // 2026-09-08 16:00
 	}
 
 	act := CalculatePlayActivityAt(matches, fixedTime)

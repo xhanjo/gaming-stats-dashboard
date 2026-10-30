@@ -124,37 +124,15 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 		}
 
 		// Об'єднуємо щойно отримані матчі з тими, що вже були збережені в базі даних
-		var combinedHistory []faceit.PlayerMatchStats
-		seenMatches := make(map[string]bool)
-
+		var recentMatches, cachedMatches []faceit.PlayerMatchStats
 		if recentForm != nil {
-			for _, m := range recentForm.MatchHistory {
-				if m.MatchId != "" && !seenMatches[m.MatchId] {
-					seenMatches[m.MatchId] = true
-					combinedHistory = append(combinedHistory, m)
-				} else if m.MatchId == "" {
-					combinedHistory = append(combinedHistory, m)
-				}
-			}
+			recentMatches = recentForm.MatchHistory
 		}
-
 		if cachedProfile != nil && cachedProfile.Recent != nil {
-			for _, m := range cachedProfile.Recent.MatchHistory {
-				if m.MatchId != "" && !seenMatches[m.MatchId] {
-					seenMatches[m.MatchId] = true
-					combinedHistory = append(combinedHistory, m)
-				} else if m.MatchId == "" {
-					combinedHistory = append(combinedHistory, m)
-				}
-			}
+			cachedMatches = cachedProfile.Recent.MatchHistory
 		}
 
-		// Сортуємо матчі від найновішого до найстарішого
-		faceit.SortMatchesDescending(combinedHistory)
-
-		if len(combinedHistory) > faceit.MaxHistorySize {
-			combinedHistory = combinedHistory[:faceit.MaxHistorySize]
-		}
+		combinedHistory := faceit.MergeMatchHistories(recentMatches, cachedMatches)
 
 		if len(combinedHistory) > 0 {
 			profile.Recent = faceit.CalculateStatsFromHistory(combinedHistory, currentElo)
@@ -164,9 +142,8 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 		}
 
 		if profile.Recent != nil && len(profile.Recent.MatchHistory) > 0 {
-			err = db.SavePlayer(ctx, profile)
-			if err != nil {
-				log.Printf("ERROR: Помилка збереження в БД: %v", err)
+			if saveErr := db.SavePlayer(ctx, profile); saveErr != nil {
+				log.Printf("ERROR: Помилка збереження в БД: %v", saveErr)
 			} else {
 				log.Printf("INFO: Дані гравця [%s] успішно збережено в БД", nickname)
 			}
@@ -174,8 +151,8 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 			log.Printf("WARN: Дані не збережено в БД, оскільки історія матчів порожня")
 		}
 
-		if err := json.NewEncoder(w).Encode(profile); err != nil {
-			log.Printf("WARN: Помилка відправки відповіді: %v", err)
+		if encErr := json.NewEncoder(w).Encode(profile); encErr != nil {
+			log.Printf("WARN: Помилка відправки відповіді: %v", encErr)
 		}
 	}
 }

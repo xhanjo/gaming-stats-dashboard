@@ -38,7 +38,7 @@ type AnalyticsReport struct {
 
 type PlaystyleReport struct {
 	Role          string    `json:"role"`
-	RadarScores   []float64 `json:"radar_scores"`   // normalized 0-100: Sniper, Entry, Assists, Multi, HS%, ADR
+	RadarScores   []float64 `json:"radar_scores"`    // normalized 0-100: Sniper, Entry, Assists, Multi, HS%, ADR
 	RawRadarStats []string  `json:"raw_radar_stats"` // formatted string tooltips
 }
 
@@ -58,27 +58,27 @@ type ClusterPoint struct {
 }
 
 type ClusterReport struct {
-	StarPoints    []ClusterPoint `json:"star_points"`
-	MidPoints     []ClusterPoint `json:"mid_points"`
-	LowPoints     []ClusterPoint `json:"low_points"`
-	StarPercent   int            `json:"star_percent"`
-	MidPercent    int            `json:"mid_percent"`
-	LowPercent    int            `json:"low_percent"`
+	StarPoints  []ClusterPoint `json:"star_points"`
+	MidPoints   []ClusterPoint `json:"mid_points"`
+	LowPoints   []ClusterPoint `json:"low_points"`
+	StarPercent int            `json:"star_percent"`
+	MidPercent  int            `json:"mid_percent"`
+	LowPercent  int            `json:"low_percent"`
 }
 
 type EloScenariosReport struct {
-	CurrentElo       int     `json:"current_elo"`
-	PredictedElo     int     `json:"predicted_elo"`
-	ExpectedPath     []int   `json:"expected_path"`
-	OptimisticPath   []int   `json:"optimistic_path"`
-	PessimisticPath  []int   `json:"pessimistic_path"`
-	FinalExpected    int     `json:"final_expected"`
-	FinalOptimistic  int     `json:"final_optimistic"`
-	FinalPessimistic int     `json:"final_pessimistic"`
-	OptWins          int     `json:"opt_wins"`
-	PesWins          int     `json:"pes_wins"`
-	ExpWins          int     `json:"exp_wins"`
-	FutureSteps      int     `json:"future_steps"`
+	CurrentElo       int   `json:"current_elo"`
+	PredictedElo     int   `json:"predicted_elo"`
+	ExpectedPath     []int `json:"expected_path"`
+	OptimisticPath   []int `json:"optimistic_path"`
+	PessimisticPath  []int `json:"pessimistic_path"`
+	FinalExpected    int   `json:"final_expected"`
+	FinalOptimistic  int   `json:"final_optimistic"`
+	FinalPessimistic int   `json:"final_pessimistic"`
+	OptWins          int   `json:"opt_wins"`
+	PesWins          int   `json:"pes_wins"`
+	ExpWins          int   `json:"exp_wins"`
+	FutureSteps      int   `json:"future_steps"`
 }
 
 type WinConditionMetric struct {

@@ -13,8 +13,6 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-const maxHistorySize = faceit.MaxHistorySize
-
 type Storage struct {
 	db *sql.DB
 }
@@ -132,41 +130,15 @@ func (s *Storage) SavePlayer(ctx context.Context, profile *faceit.PlayerProfile)
 			return fmt.Errorf("read history: %w", readErr)
 		}
 
-		var combinedHistory []faceit.PlayerMatchStats
-		existingMatches := make(map[string]bool)
-
+		var cachedHistory []faceit.PlayerMatchStats
 		if oldHistoryText != "" {
-			if unmarshalErr := json.Unmarshal([]byte(oldHistoryText), &combinedHistory); unmarshalErr != nil {
+			if unmarshalErr := json.Unmarshal([]byte(oldHistoryText), &cachedHistory); unmarshalErr != nil {
 				log.Printf("WARN: corrupt recent_history for %s: %v", profile.Nickname, unmarshalErr)
-				combinedHistory = nil
-			}
-			for _, m := range combinedHistory {
-				if m.MatchId != "" {
-					existingMatches[m.MatchId] = true
-				}
+				cachedHistory = nil
 			}
 		}
 
-		var newMatches []faceit.PlayerMatchStats
-		for _, m := range profile.Recent.MatchHistory {
-			if m.MatchId != "" && !existingMatches[m.MatchId] {
-				newMatches = append(newMatches, m)
-				existingMatches[m.MatchId] = true
-			} else if m.MatchId == "" {
-				newMatches = append(newMatches, m)
-			}
-		}
-
-		finalHistory := make([]faceit.PlayerMatchStats, 0, len(newMatches)+len(combinedHistory))
-		finalHistory = append(finalHistory, newMatches...)
-		finalHistory = append(finalHistory, combinedHistory...)
-
-		// Гарантуємо хронологічний порядок від найновішого до найстарішого
-		faceit.SortMatchesDescending(finalHistory)
-
-		if len(finalHistory) > maxHistorySize {
-			finalHistory = finalHistory[:maxHistorySize]
-		}
+		finalHistory := faceit.MergeMatchHistories(profile.Recent.MatchHistory, cachedHistory)
 
 		if len(finalHistory) > 0 {
 			profile.Recent = faceit.CalculateStatsFromHistory(finalHistory, cs2Stats.FaceitElo)
