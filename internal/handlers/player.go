@@ -80,7 +80,7 @@ func GetPlayerStats(db Database, faceitSvc FaceitService) http.HandlerFunc {
 		if limit > defaultMatchLimit {
 			log.Printf("INFO: Запущено ГЛИБОКИЙ АНАЛІЗ для [%s] (limit=%d)", nickname, limit)
 		} else if dbErr == nil && cachedProfile != nil {
-			log.Printf("INFO: Кеш застарів (останнє оновлення: %s). Оновлення нових матчів з Faceit API для [%s]...", cachedProfile.LastUpdated.Format("15:04:05"), nickname)
+			log.Printf("INFO: Кеш застарів (останнє оновлення: %s). Оновлення нових матчів з Faceit API для [%s]...", cachedProfile.LastUpdated.Format("2006-01-02 15:04:05"), nickname)
 		} else {
 			log.Printf("INFO: Кеш порожній. Перший запит до Faceit API для [%s] (limit=%d)...", nickname, limit)
 		}
